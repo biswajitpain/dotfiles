@@ -1,0 +1,13 @@
+[user]
+    name = Your VM Name
+    email = your.vm@company.com
+[core]
+    environment = LANG=en_US
+    editor = vim
+    excludesfile = ~/.gitignore_global
+[color]
+    ui = auto
+[pull]
+    rebase = false
+[init]
+    defaultBranch = main
