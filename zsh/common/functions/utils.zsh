@@ -5,9 +5,13 @@ log() { echo -e "\033[0;32m[LOG]\033[0m $1"; }
 warn() { echo -e "\033[1;33m[WARN]\033[0m $1"; }
 error() { echo -e "\033[0;31m[ERROR]\033[0m $1"; }
 
+#mkdir -p ~/.dotfiles/{zsh/{common/{aliases,functions},os/{macos,linux}/{aliases,functions},computers},git,vim,tmux} && touch ~/.dotfiles/{zsh/.zshrc,zsh/common/{aliases/general.zsh,functions/utils.zsh},zsh/os/{macos,linux}/{aliases/{macos,linux}_aliases.zsh,functions/{macos,linux}_functions.zsh},zsh/computers/default.zsh,git/.gitconfig,vim/.vimrc,tmux/.tmux.conf,install.sh,README.md} && chmod +x ~/.dotfiles/install.sh && echo "Dotfiles structure created in ~/.dotfiles"
+
 # mkd: Create a new directory and enter it
 # Usage: mkd <directory_name>
 # Description: Creates a new directory and changes into it.
+
+
 mkd() {
     mkdir -p "$@" && cd "$_"
 }
@@ -18,12 +22,12 @@ mkd() {
 # it uses a default message with the current user and timestamp.
 gmsg() {
     if [ ! -d .git ]; then
-        error "Not a git repository. Please run this command from the root of a git repository."
+        echo "Error: Not a git repository. Please run this command from the root of a git repository."
         return 1
     fi
 
     if git diff --cached --quiet; then
-        error "No staged changes to commit. Use 'git add' to stage changes."
+        echo "Error: No staged changes to commit. Use 'git add' to stage changes."
         return 1
     fi
 
@@ -39,33 +43,9 @@ gmsg() {
     git commit -m "$commit_message"
 
     if [ $? -eq 0 ]; then
-        log "Changes committed successfully."
+        echo "Changes committed successfully."
     else
-        error "Failed to commit changes."
-    fi
-}
-# rbase: Rebase the last x commits
-# Usage: rbase <number_of_commits>
-# Description: Rebases the last x commits interactively.
-rbase() {
-    if [ ! -d .git ]; then
-        error "Not a git repository. Please run this command from the root of a git repository."
-        return 1
-    fi
-
-    if [ -z "$1" ]; then
-        error "Please provide the number of commits to rebase."
-        return 1
-    fi
-
-    local num_commits="$1"
-
-    git rebase -i HEAD~"$num_commits"
-
-    if [ $? -eq 0 ]; then
-        log "Rebase completed successfully."
-    else
-        error "Rebase failed. Please resolve conflicts and continue the rebase."
+        echo "Error: Failed to commit changes."
     fi
 }
 
