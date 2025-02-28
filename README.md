@@ -1,4 +1,3 @@
-Certainly! Here's a comprehensive README for your dotfiles repository:
 
 ```markdown
 # Dotfiles
@@ -13,12 +12,18 @@ This repository contains my personal dotfiles for configuring development enviro
 - Linux VM 1
 - Linux VM 2
 
-## Quick Start
 
+
+```
+
+## Usage
 To install these dotfiles on a new machine, run:
-
 ```bash
+
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/biswajitpain/dotfiles/main/install.sh)"
+
+./install.sh [local] [machine <machine_name>] [package <package_name>]
+
 ```
 
 This command will download and execute the installation script, setting up your environment automatically.
@@ -150,7 +155,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 If you have any questions or suggestions, feel free to reach out:
 
 - GitHub: [@biswajitpain](https://github.com/biswajitpain)
-- Email: your.email@example.com
+- Email: biswajit.pain@outlook.com
 
 ---
 
