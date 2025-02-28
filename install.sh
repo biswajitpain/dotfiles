@@ -18,7 +18,7 @@ error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
 # Display help message
 show_help() {
-    echo "Usage: $0 <machine_name>"
+    echo "Usage: $0 [local] [machine <machine_name>] [package <package_name>]"
     echo "Available machine names:"
     echo "  personal-macbook"
     echo "  office-mac1"
@@ -26,6 +26,8 @@ show_help() {
     echo "  linux-vm1"
     echo "  linux-vm2"
     echo "Example: $0 personal-macbook"
+    echo "Example: $0 local personal-macbook"
+    echo "Example: $0 package vim"
 }
 
 # Set machine type
@@ -43,13 +45,29 @@ get_machine_type() {
     fi
 }
 
-
 # Check for dependencies
 check_dependencies() {
     log "Checking dependencies..."
     for dep in git curl zsh vim tmux; do
         if ! command -v "$dep" &> /dev/null; then
-            error "$dep is not installed. Please install it and try again."
+            warn "$dep is not installed. Attempting to install it..."
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                if command -v brew &> /dev/null; then
+                    brew install "$dep"
+                else
+                    error "Homebrew is not installed. Please install Homebrew and try again."
+                fi
+            elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+                if command -v apt &> /dev/null; then
+                    sudo apt update && sudo apt install -y "$dep"
+                elif command -v yum &> /dev/null; then
+                    sudo yum install -y "$dep"
+                else
+                    error "Neither apt nor yum is available. Please install $dep manually and try again."
+                fi
+            else
+                error "Unsupported OS. Please install $dep manually and try again."
+            fi
         fi
     done
 }
@@ -128,6 +146,7 @@ setup_remote_branch() {
         warn "Dotfiles directory is not a git repository. Skipping remote branch setup."
     fi
 }
+
 # Main installation process
 main() {
     if [ $# -eq 0 ]; then
@@ -135,16 +154,49 @@ main() {
         exit 1
     fi
 
-    MACHINE_NAME="$1"
+    USE_LOCAL=false
+    MACHINE_NAME=""
+    PACKAGE_NAME=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            local)
+                USE_LOCAL=true
+                shift
+                ;;
+            machine)
+                MACHINE_NAME="$2"
+                shift 2
+                ;;
+            package)
+                PACKAGE_NAME="$2"
+                shift 2
+                ;;
+            *)
+                MACHINE_NAME="$1"
+                shift
+                ;;
+        esac
+    done
+
+    if [ -z "$MACHINE_NAME" ]; then
+        show_help
+        exit 1
+    fi
+
     log "Setting up dotfiles for machine: $MACHINE_NAME"
 
-    if [ ! -d "$DOTFILES_DIR" ]; then
-        log "Cloning dotfiles repository..."
-        git clone "$DOTFILES_REPO" "$DOTFILES_DIR"
+    if [ "$USE_LOCAL" = false ]; then
+        if [ ! -d "$DOTFILES_DIR" ]; then
+            log "Cloning dotfiles repository..."
+            git clone "$DOTFILES_REPO" "$DOTFILES_DIR"
+        else
+            log "Updating dotfiles repository..."
+            setup_remote_branch
+            git -C "$DOTFILES_DIR" pull
+        fi
     else
-        log "Updating dotfiles repository..."
-        setup_remote_branch
-        git -C "$DOTFILES_DIR" pull
+        log "Performing a dry run using local dotfiles directory..."
     fi
 
     set_machine_type "$MACHINE_NAME"
@@ -164,6 +216,27 @@ main() {
     link_file "$DOTFILES_DIR/tmux/.tmux.conf" "$HOME/.tmux.conf"
 
     setup_git_config
+
+    if [ -n "$PACKAGE_NAME" ]; then
+        log "Installing package: $PACKAGE_NAME"
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            if command -v brew &> /dev/null; then
+                brew install "$PACKAGE_NAME"
+            else
+                error "Homebrew is not installed. Please install Homebrew and try again."
+            fi
+        elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            if command -v apt &> /dev/null; then
+                sudo apt update && sudo apt install -y "$PACKAGE_NAME"
+            elif command -v yum &> /dev/null; then
+                sudo yum install -y "$PACKAGE_NAME"
+            else
+                error "Neither apt nor yum is available. Please install $PACKAGE_NAME manually and try again."
+            fi
+        else
+            error "Unsupported OS. Please install $PACKAGE_NAME manually and try again."
+        fi
+    fi
 
     log "Installation complete! Machine name: $MACHINE_NAME"
     log "Please restart your terminal or run 'source ~/.zshrc' to apply the changes."
