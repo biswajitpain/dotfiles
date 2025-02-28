@@ -1,5 +1,10 @@
 #!/usr/bin/env zsh
 
+# Log functions
+log() { echo -e "\033[0;32m[LOG]\033[0m $1"; }
+warn() { echo -e "\033[1;33m[WARN]\033[0m $1"; }
+error() { echo -e "\033[0;31m[ERROR]\033[0m $1"; }
+
 # mkd: Create a new directory and enter it
 # Usage: mkd <directory_name>
 # Description: Creates a new directory and changes into it.
@@ -37,6 +42,30 @@ gmsg() {
         log "Changes committed successfully."
     else
         error "Failed to commit changes."
+    fi
+}
+# rbase: Rebase the last x commits
+# Usage: rbase <number_of_commits>
+# Description: Rebases the last x commits interactively.
+rbase() {
+    if [ ! -d .git ]; then
+        error "Not a git repository. Please run this command from the root of a git repository."
+        return 1
+    fi
+
+    if [ -z "$1" ]; then
+        error "Please provide the number of commits to rebase."
+        return 1
+    fi
+
+    local num_commits="$1"
+
+    git rebase -i HEAD~"$num_commits"
+
+    if [ $? -eq 0 ]; then
+        log "Rebase completed successfully."
+    else
+        error "Rebase failed. Please resolve conflicts and continue the rebase."
     fi
 }
 
