@@ -1,7 +1,6 @@
 # User configuration
 export LC_ALL=en_US.UTF-8
-export GOPATH=$HOME/work/personal/workspace/golang
-export GOPATH=$GOPATH:$HOME/work/personal/code/go
+export GOPATH="$HOME/work/personal/workspace/golang:$HOME/work/personal/code/go"
 
 alias venv3="source ~/.envs/venv3/bin/activate"
 alias gti=git
@@ -12,7 +11,6 @@ alias nv="nvim"
 alias devd="ssh devd"
 alias devsync="unison amz"
 alias alljava="/usr/libexec/java_home -V"
-alias pass="expect ~/mwinint-auth.exp"
 export NVM_DIR="$HOME/.nvm"
 [ -s "/opt/homebrew/opt/nvm/nvm.sh" ] && \. "/opt/homebrew/opt/nvm/nvm.sh"  # This loads nvm
 [ -s "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
@@ -28,11 +26,9 @@ fi
 export PATH=$PATH:$HOME/.toolbox/bin
 
 dt() {
-  if [ $# -lt 1 ]
-  then
-    echo "Usage: $funcstack[1] <pass port number>"
-    return
-  fi
-
- ssh -N -L $1\:localhost:$1  devm
+    if [ $# -lt 1 ]; then
+        echo "Usage: $0 <port>"
+        return 1
+    fi
+    ssh -N -L "$1:localhost:$1" devm
 }
