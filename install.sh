@@ -18,31 +18,18 @@ error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
 # Display help message
 show_help() {
-    echo "Usage: $0 [local] [machine <machine_name>] [package <package_name>]"
-    echo "Available machine names:"
-    echo "  personal-macbook"
-    echo "  office-mac1"
-    echo "  office-mac2"
-    echo "  linux-vm1"
-    echo "  linux-vm2"
-    echo "Example: $0 personal-macbook"
-    echo "Example: $0 local personal-macbook"
+    echo "Usage: $0 [options]"
+    echo "Options:"
+    echo "  -h, --help               : Show this help message."
+    echo "  machine <machine_name>   : Specify machine name manually."
+    echo "  local                    : Use local dotfiles directory instead of cloning."
+    echo "  package <package_name>   : Install a package."
+    echo
+    echo "If machine name is not provided, it will be detected automatically."
+    echo "Example: $0"
+    echo "Example: $0 machine personal-macbook"
+    echo "Example: $0 local"
     echo "Example: $0 package vim"
-}
-
-# Set machine type
-set_machine_type() {
-    echo "$1" > "$DOTFILES_DIR/.machine_type"
-    log "Machine type set to: $1"
-}
-
-# Get machine type
-get_machine_type() {
-    if [ -f "$DOTFILES_DIR/.machine_type" ]; then
-        cat "$DOTFILES_DIR/.machine_type"
-    else
-        error "Machine type not set. Please run the install script first."
-    fi
 }
 
 # Check for dependencies
@@ -121,6 +108,8 @@ setup_git_config() {
 EOL
     fi
 
+    # Backup existing .gitconfig before creating new symlink
+    backup_file "$HOME/.gitconfig"
     link_file "$git_config_file" "$HOME/.gitconfig"
     log "Git config set up for $MACHINE_NAME"
 }
@@ -149,11 +138,6 @@ setup_remote_branch() {
 
 # Main installation process
 main() {
-    if [ $# -eq 0 ]; then
-        show_help
-        exit 1
-    fi
-
     USE_LOCAL=false
     MACHINE_NAME=""
     PACKAGE_NAME=""
@@ -172,16 +156,25 @@ main() {
                 PACKAGE_NAME="$2"
                 shift 2
                 ;;
+            -h|--help)
+                show_help
+                exit 0
+                ;;
             *)
-                MACHINE_NAME="$1"
-                shift
+                show_help
+                exit 1
                 ;;
         esac
     done
 
     if [ -z "$MACHINE_NAME" ]; then
-        show_help
-        exit 1
+        log "Machine name not provided, detecting automatically..."
+        if [[ "$(uname)" == "Darwin" ]]; then
+            MACHINE_NAME=$(scutil --get ComputerName)
+        else
+            MACHINE_NAME=$(hostname -s 2>/dev/null || hostname 2>/dev/null || echo "default")
+        fi
+        log "Detected machine name: $MACHINE_NAME"
     fi
 
     log "Setting up dotfiles for machine: $MACHINE_NAME"
@@ -199,15 +192,13 @@ main() {
         log "Performing a dry run using local dotfiles directory..."
     fi
 
-    set_machine_type "$MACHINE_NAME"
-
     check_dependencies
     install_oh_my_zsh
     
     # Backup and link dotfiles
     log "Backing up existing dotfiles and creating symlinks..."
     backup_file "$HOME/.zshrc"
-    backup_file "$HOME/.gitconfig"
+    # .gitconfig is backed up in setup_git_config
     backup_file "$HOME/.vimrc"
     backup_file "$HOME/.tmux.conf"
 
