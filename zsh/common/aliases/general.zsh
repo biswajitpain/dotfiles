@@ -29,7 +29,7 @@ alias meminfo='free -m -l -t'
 
 # Process management
 alias psa="ps aux"
-alias psg="ps aux | grep "
+alias psg="ps aux | grep -v grep | grep"
 alias psr='ps aux | grep ruby'
 
 # Network
@@ -75,8 +75,7 @@ alias kgd='kubectl get deployments'
 # Misc
 alias h='history'
 alias j='jobs -l'
-alias path='echo -e ${PATH//:/\\n}'
-alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history|tail -n1|sed -e '\''s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//'\'')"'
+alias path='echo -e ${PATH//:/\n}'
 
 # Reload zsh configuration
 alias reload='source ~/.zshrc'

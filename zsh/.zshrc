@@ -1,64 +1,73 @@
 # Path to your oh-my-zsh installation.
 export ZSH="$HOME/.oh-my-zsh"
 
-# Set name of the theme to load
-ZSH_THEME="robbyrussell"
-
-# Plugins
-plugins=(git docker kubectl)
-
+# Set name of the theme to load.
+# See https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
 ZSH_THEME="bira"
 
-# Set Prompt
-PROMPT='%n:%W:~$'
+# Set plugins.
+# See https://github.com/ohmyzsh/ohmyzsh/wiki/Plugins
+plugins=(git aws docker kubectl)
 
-# Plugins
-plugins=(git  aws docker kubectl)
-
-# History
+# History configuration
 HIST_STAMPS="mm/dd/yyyy"
 HISTFILE=~/.zhist
 HISTSIZE=10000000
 SAVEHIST=10000000
 
-source $ZSH/oh-my-zsh.sh
+# Source Oh My Zsh
+source "$ZSH/oh-my-zsh.sh"
 
 # User configuration
 export LANG=en_US.UTF-8
 export EDITOR='vim'
 
 # Dotfiles directory
-DOTFILES_DIR="$HOME/.dotfiles"
+export DOTFILES_DIR="$HOME/.dotfiles"
 
 # Load machine type
-MACHINE_TYPE=$(cat "$DOTFILES_DIR/.machine_type" 2>/dev/null || echo "default")
+if [ -z "$MACHINE_TYPE" ]; then
+    if [ "$(uname)" = "Darwin" ]; then
+        MACHINE_TYPE=$(scutil --get ComputerName)
+    else
+        MACHINE_TYPE=$(hostname -s 2>/dev/null || hostname 2>/dev/null || echo "default")
+    fi
+    export MACHINE_TYPE
+fi
 
 # Function to source files if they exist
 source_if_exists() {
-    [ -f "$1" ] && source "$1"
+    for file in "$@"; do
+        [ -f "$file" ] && source "$file"
+    done
 }
 
 # Load common aliases and functions
-source_if_exists "$DOTFILES_DIR/zsh/common/aliases/general.zsh"
-source_if_exists "$DOTFILES_DIR/zsh/common/functions/utils.zsh"
-source_if_exists "$DOTFILES_DIR/zsh/common/functions/check_dotfiles_update.zsh"
+source_if_exists \
+    "$DOTFILES_DIR/zsh/common/aliases/general.zsh" \
+    "$DOTFILES_DIR/zsh/common/functions/utils.zsh" \
+    "$DOTFILES_DIR/zsh/common/functions/check_dotfiles_update.zsh"
 
 # Load OS-specific aliases and functions
 case "$(uname)" in
     Darwin)
-        source_if_exists "$DOTFILES_DIR/zsh/os/macos/aliases/macos_aliases.zsh"
-        source_if_exists "$DOTFILES_DIR/zsh/os/macos/functions/macos_functions.zsh"
+        source_if_exists \
+            "$DOTFILES_DIR/zsh/os/macos/aliases/macos_aliases.zsh" \
+            "$DOTFILES_DIR/zsh/os/macos/functions/macos_functions.zsh"
         ;;
     Linux)
-        source_if_exists "$DOTFILES_DIR/zsh/os/linux/aliases/linux_aliases.zsh"
-        source_if_exists "$DOTFILES_DIR/zsh/os/linux/functions/linux_functions.zsh"
+        source_if_exists \
+            "$DOTFILES_DIR/zsh/os/linux/aliases/linux_aliases.zsh" \
+            "$DOTFILES_DIR/zsh/os/linux/functions/linux_functions.zsh"
         ;;
 esac
 
 # Load machine-specific configurations
 source_if_exists "$DOTFILES_DIR/zsh/machines/$MACHINE_TYPE.zsh"
 
-# Run the auto-update check
-check_dotfiles_update
+# Run the auto-update check in the background
+if [[ $- == *i* ]]; then
+    check_dotfiles_update &
+fi
 
 # Your custom configurations below this line

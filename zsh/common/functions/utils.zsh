@@ -75,7 +75,14 @@ dataurl() {
 # Description: Starts a Python HTTP server in the current directory. Default port is 8000.
 server() {
     local port="${1:-8000}"
-    python -m SimpleHTTPServer "$port"
+    if command -v python3 &>/dev/null; then
+        python3 -m http.server "$port"
+    elif command -v python &>/dev/null; then
+        python -m SimpleHTTPServer "$port"
+    else
+        echo "Error: Python is not installed. Please install Python and try again."
+        return 1
+    fi
 }
 
 # weather: Get weather
@@ -126,35 +133,7 @@ tmpd() {
 # Usage: targz <directory>
 # Description: Creates a compressed tar archive of the specified directory.
 targz() {
-    local tmpFile="${1%/}.tar"
-    tar -cvf "${tmpFile}" --exclude=".DS_Store" "${1}" || return 1
-
-    size=$(
-        stat -f"%z" "${tmpFile}" 2> /dev/null; # macOS `stat`
-        stat -c"%s" "${tmpFile}" 2> /dev/null;  # GNU `stat`
-    )
-
-    local cmd=""
-    if (( size < 52428800 )) && hash zopfli 2> /dev/null; then
-        cmd="zopfli"
-    else
-        if hash pigz 2> /dev/null; then
-            cmd="pigz"
-        else
-            cmd="gzip"
-        fi
-    fi
-
-    echo "Compressing .tar ($((size / 1000)) kB) using \`${cmd}\`…"
-    "${cmd}" -v "${tmpFile}" || return 1
-    [ -f "${tmpFile}" ] && rm "${tmpFile}"
-
-    zippedSize=$(
-        stat -f"%z" "${tmpFile}.gz" 2> /dev/null; # macOS `stat`
-        stat -c"%s" "${tmpFile}.gz" 2> /dev/null; # GNU `stat`
-    )
-
-    echo "${tmpFile}.gz ($((zippedSize / 1000)) kB) created successfully."
+    tar -czvf "${1%/}.tar.gz" --exclude=".DS_Store" "${1}"
 }
 
 # fs: Determine size of a file or total size of a directory
@@ -238,12 +217,12 @@ digprop() {
     dig "$1" @208.67.222.222 +short
 }
 
-# digns: DNS lookup with specific nameserver
-# Usage: digns <domain> <nameserver>
+# digns_server: DNS lookup with specific nameserver
+# Usage: digns_server <domain> <nameserver>
 # Description: Allows querying a specific nameserver for DNS information.
-digns() {
+digns_server() {
     if [ $# -ne 2 ]; then
-        echo "Usage: digns <domain> <nameserver>"
+        echo "Usage: digns_server <domain> <nameserver>"
         return 1
     fi
     dig "@$2" "$1"
@@ -260,33 +239,16 @@ digga() {
 # Usage: getcertnames <domain>
 # Description: Retrieves and displays the Common Name and Subject Alternative Names from the SSL certificate of a domain.
 getcertnames() {
-    if [ -z "${1}" ]; then
-        echo "ERROR: No domain specified.";
-        return 1;
-    fi;
+    if [ -z "$1" ]; then
+        echo "ERROR: No domain specified."
+        return 1
+    fi
 
-    local domain="${1}";
-    echo "Testing ${domain}…";
-    echo ""; # newline
+    echo "Testing $1…"
+    echo ""
 
-    local tmp=$(echo -e "GET / HTTP/1.0\nEOT" \
-        | openssl s_client -connect "${domain}:443" -servername "${domain}" 2>&1);
-
-    if [[ "${tmp}" = *"-----BEGIN CERTIFICATE-----"* ]]; then
-        local certText=$(echo "${tmp}" \
-            | openssl x509 -text -certopt "no_aux, no_header, no_issuer, no_pubkey, \
-            no_serial, no_sigdump, no_signame, no_validity, no_version");
-        echo "Common Name:";
-        echo ""; # newline
-        echo "${certText}" | grep "Subject:" | sed -e "s/^.*CN=//" | sed -e "s/\/emailAddress=.*//";
-        echo ""; # newline
-        echo "Subject Alternative Name(s):";
-        echo ""; # newline
-        echo "${certText}" | grep -A 1 "Subject Alternative Name:" \
-            | sed -e "2s/DNS://g" -e "s/ //g" | tr "," "\n" | tail -n +2;
-        return 0;
-    else
-        echo "ERROR: Certificate not found.";
-        return 1;
-    fi;
+    openssl s_client -servername "$1" -connect "$1:443" 2>/dev/null | \
+        openssl x509 -noout -text | \
+        awk '/X509v3 Subject Alternative Name/ {getline; print}' | \
+        sed -e 's/DNS://g' -e 's/ //g' | tr ',' '\n'
 }
