@@ -282,7 +282,20 @@ main() {
         else
             log "Updating dotfiles repository..."
             setup_remote_branch
-            git -C "$DOTFILES_DIR" pull
+            # Pull, backing up any untracked files that conflict with incoming changes
+            local pull_output
+            pull_output=$(git -C "$DOTFILES_DIR" pull --rebase=false 2>&1)
+            if echo "$pull_output" | grep -q "would be overwritten by merge"; then
+                warn "Untracked files conflict with incoming changes — backing them up..."
+                local conflicting
+                conflicting=$(echo "$pull_output" | awk '/The following untracked/{found=1; next} found && /^$/{exit} found{print}' | sed 's/^[[:space:]]*//')
+                while IFS= read -r file; do
+                    [ -n "$file" ] && backup_file "$DOTFILES_DIR/$file"
+                done <<< "$conflicting"
+                git -C "$DOTFILES_DIR" pull --rebase=false
+            else
+                echo "$pull_output"
+            fi
         fi
     else
         log "Performing a dry run using local dotfiles directory..."
