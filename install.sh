@@ -310,11 +310,14 @@ main() {
 
     setup_git_config
 
-    # Install pre-commit hook globally for all git repos on this machine
-    local hooks_dir="$DOTFILES_DIR/git/hooks"
-    chmod +x "$hooks_dir/pre-commit" 2>/dev/null || true
-    git config --global core.hooksPath "$hooks_dir"
-    log "Pre-commit secret scanner enabled globally (core.hooksPath=$hooks_dir)"
+    # Install pre-commit hook for the dotfiles repo only
+    local hook_src="$DOTFILES_DIR/git/hooks/pre-commit"
+    local hook_dst="$DOTFILES_DIR/.git/hooks/pre-commit"
+    if [ -f "$hook_src" ]; then
+        chmod +x "$hook_src"
+        ln -sf "$hook_src" "$hook_dst"
+        log "Pre-commit secret scanner installed for dotfiles repo"
+    fi
 
     # Set up Azure subscription mapping if not already present
     local az_subs_file="$DOTFILES_DIR/config/azure-subscriptions.env"
