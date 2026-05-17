@@ -1,0 +1,20 @@
+[user]
+    name = biswajitpain
+    email = biswajit.pain@outlook.com
+    signingkey = ~/.ssh/id_biswajitpain_github.pub
+[core]
+    editor = vim
+[color]
+    ui = auto
+[pull]
+    rebase = false
+[init]
+    defaultBranch = main
+[gpg]
+    format = ssh
+[commit]
+    gpgsign = true
+[tag]
+    gpgsign = true
+[gpg "ssh"]
+    allowedSignersFile = ~/.ssh/allowed_signers

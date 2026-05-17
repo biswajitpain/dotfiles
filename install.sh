@@ -24,12 +24,14 @@ show_help() {
     echo "  machine <machine_name>   : Specify machine name manually."
     echo "  local                    : Use local dotfiles directory instead of cloning."
     echo "  package <package_name>   : Install a package."
+    echo "  --gpg                    : Set up GPG commit signing after install."
     echo
     echo "If machine name is not provided, it will be detected automatically."
     echo "Example: $0"
     echo "Example: $0 machine personal-macbook"
     echo "Example: $0 local"
     echo "Example: $0 package vim"
+    echo "Example: $0 --gpg"
 }
 
 # Check for dependencies
@@ -97,7 +99,43 @@ setup_git_config() {
         read -p "Enter your Git user name: " git_name
         read -p "Enter your Git email: " git_email
         
-        cat > "$git_config_file" <<EOL
+        # Detect SSH signing key: prefer machine-specific, fall back to shared key
+        local machine_key="$HOME/.ssh/id_${MACHINE_NAME}.pub"
+        local fallback_key="$HOME/.ssh/id_biswajitpain_github.pub"
+        local signing_key=""
+        if [ -f "$machine_key" ]; then
+            signing_key="~/.ssh/id_${MACHINE_NAME}.pub"
+        elif [ -f "$fallback_key" ]; then
+            signing_key="~/.ssh/id_biswajitpain_github.pub"
+        fi
+
+        if [ -n "$signing_key" ]; then
+            cat > "$git_config_file" <<EOL
+[user]
+    name = $git_name
+    email = $git_email
+    signingkey = $signing_key
+[core]
+    editor = vim
+[color]
+    ui = auto
+[pull]
+    rebase = false
+[init]
+    defaultBranch = main
+[gpg]
+    format = ssh
+[commit]
+    gpgsign = true
+[tag]
+    gpgsign = true
+[gpg "ssh"]
+    allowedSignersFile = ~/.ssh/allowed_signers
+EOL
+            log "SSH signing configured with key: $signing_key"
+        else
+            warn "No SSH key found at $machine_key or $fallback_key — signing disabled."
+            cat > "$git_config_file" <<EOL
 [user]
     name = $git_name
     email = $git_email
@@ -105,13 +143,66 @@ setup_git_config() {
     editor = vim
 [color]
     ui = auto
+[pull]
+    rebase = false
+[init]
+    defaultBranch = main
+[commit]
+    gpgsign = false
 EOL
+        fi
     fi
 
     # Backup existing .gitconfig before creating new symlink
     backup_file "$HOME/.gitconfig"
     link_file "$git_config_file" "$HOME/.gitconfig"
     log "Git config set up for $MACHINE_NAME"
+}
+
+# Set up SSH commit signing
+setup_ssh_signing() {
+    log "Setting up SSH commit signing..."
+
+    local machine_key="$HOME/.ssh/id_${MACHINE_NAME}.pub"
+    local fallback_key="$HOME/.ssh/id_biswajitpain_github.pub"
+    local signing_key=""
+
+    if [ -f "$machine_key" ]; then
+        signing_key="$machine_key"
+        log "Using machine-specific key: $machine_key"
+    elif [ -f "$fallback_key" ]; then
+        signing_key="$fallback_key"
+        log "No machine key found. Using fallback: $fallback_key"
+    else
+        warn "No SSH key found at $machine_key or $fallback_key."
+        warn "Generate one with: ssh-keygen -t ed25519 -C 'your@email.com' -f ~/.ssh/id_${MACHINE_NAME}"
+        return 1
+    fi
+
+    # Configure git for SSH signing
+    git config --global gpg.format ssh
+    git config --global user.signingkey "$signing_key"
+    git config --global commit.gpgsign true
+    git config --global tag.gpgsign true
+
+    # Set up allowed_signers for signature verification
+    local allowed_signers="$HOME/.ssh/allowed_signers"
+    local email
+    email=$(git config --global user.email 2>/dev/null || echo "")
+    if [ -n "$email" ]; then
+        local pubkey
+        pubkey=$(cat "$signing_key")
+        if ! grep -qF "$pubkey" "$allowed_signers" 2>/dev/null; then
+            echo "$email namespaces=\"git\" $pubkey" >> "$allowed_signers"
+            chmod 600 "$allowed_signers"
+            log "Added key to $allowed_signers"
+        fi
+    fi
+
+    git config --global gpg.ssh.allowedSignersFile "$HOME/.ssh/allowed_signers"
+
+    log "SSH signing enabled. Add your public key to GitHub:"
+    log "  cat $signing_key"
 }
 
 # Set up remote branch for dotfiles repository
@@ -141,6 +232,7 @@ main() {
     USE_LOCAL=false
     MACHINE_NAME=""
     PACKAGE_NAME=""
+    SETUP_GPG=false
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -155,6 +247,10 @@ main() {
             package)
                 PACKAGE_NAME="$2"
                 shift 2
+                ;;
+            --gpg)
+                SETUP_GPG=true
+                shift
                 ;;
             -h|--help)
                 show_help
@@ -201,12 +297,31 @@ main() {
     # .gitconfig is backed up in setup_git_config
     backup_file "$HOME/.vimrc"
     backup_file "$HOME/.tmux.conf"
+    backup_file "$HOME/.ssh/config"
 
     link_file "$DOTFILES_DIR/zsh/.zshrc" "$HOME/.zshrc"
     link_file "$DOTFILES_DIR/vim/.vimrc" "$HOME/.vimrc"
     link_file "$DOTFILES_DIR/tmux/.tmux.conf" "$HOME/.tmux.conf"
 
+    mkdir -p "$HOME/.ssh"
+    chmod 700 "$HOME/.ssh"
+    link_file "$DOTFILES_DIR/ssh/config" "$HOME/.ssh/config"
+    chmod 600 "$DOTFILES_DIR/ssh/config"
+
     setup_git_config
+
+    # Set up Azure subscription mapping if not already present
+    local az_subs_file="$DOTFILES_DIR/config/azure-subscriptions.env"
+    local az_subs_template="$DOTFILES_DIR/config/azure-subscriptions.env.template"
+    if [ ! -f "$az_subs_file" ] && [ -f "$az_subs_template" ]; then
+        \cp "$az_subs_template" "$az_subs_file"
+        warn "Azure subscriptions file created from template: $az_subs_file"
+        warn "Edit it to add your real subscription IDs."
+    fi
+
+    if [ "$SETUP_GPG" = true ]; then
+        setup_ssh_signing
+    fi
 
     if [ -n "$PACKAGE_NAME" ]; then
         log "Installing package: $PACKAGE_NAME"

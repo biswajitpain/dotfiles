@@ -1,6 +1,7 @@
 [user]
     name = Biswajit Pain
     email = biswajit.pain@outlook.com
+    signingkey = ~/.ssh/id_office-mac2.pub
 [core]
     environment = LANG=en_US
     editor = vim
@@ -13,3 +14,10 @@
     defaultBranch = main
 [commit]
     template = ~/.gitmessage
+    gpgsign = true
+[tag]
+    gpgsign = true
+[gpg]
+    format = ssh
+[gpg "ssh"]
+    allowedSignersFile = ~/.ssh/allowed_signers

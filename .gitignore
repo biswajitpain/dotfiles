@@ -2,3 +2,5 @@
 .machine_type
 gitconfig.office-mac1
 .claude/
+config/azure/
+config/azure-subscriptions.env
