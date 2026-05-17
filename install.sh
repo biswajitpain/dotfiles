@@ -321,6 +321,14 @@ main() {
     link_file "$DOTFILES_DIR/ssh/config" "$HOME/.ssh/config"
     chmod 600 "$DOTFILES_DIR/ssh/config"
 
+    mkdir -p "$HOME/.aws"
+    backup_file "$HOME/.aws/config"
+    link_file "$DOTFILES_DIR/aws/config" "$HOME/.aws/config"
+
+    mkdir -p "$HOME/.kube"
+    backup_file "$HOME/.kube/config"
+    link_file "$DOTFILES_DIR/kube/config" "$HOME/.kube/config"
+
     setup_git_config
 
     # Install pre-commit hook for the dotfiles repo only

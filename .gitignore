@@ -4,3 +4,10 @@ gitconfig.office-mac1
 .claude/
 config/azure/
 config/azure-subscriptions.env
+aws/credentials
+aws/sso/
+aws/cli/
+aws/backups/
+kube/cache/
+kube/http-cache/
+kube/gke_gcloud_auth_plugin_cache

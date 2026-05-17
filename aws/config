@@ -1,0 +1,71 @@
+# AWS CLI Configuration for Biswajit Pain
+# Generated on Thu Dec  4 22:41:51 CET 2025
+#
+# This file contains profiles for cross-account access from the management account.
+# For security reasons, access keys are stored separately in ~/.aws/credentials
+#
+# To use these profiles:
+#   aws s3 ls --profile prod
+#   aws ec2 describe-instances --profile staging
+#
+
+# BigLySales Management Account
+
+[profile default]
+region = use-east-1
+output = json
+
+[profile management]
+region = us-east-1
+output = json
+# BigLySales Production Account
+[profile prod]
+region = us-east-1
+role_arn = arn:aws:iam::205994120142:role/OrganizationAccountAccessRole
+source_profile = default
+output = json
+duration_seconds = 3600
+
+#BiglySales Shared Account
+[profile shared]
+region = us-east-1
+role_arn = arn:aws:iam::604438879331:role/OrganizationAccountAccessRole
+source_profile = default
+output = json
+duration_seconds = 3600
+
+
+# BigLySales Staging Account
+[profile staging]
+region = us-east-1
+role_arn = arn:aws:iam::399485458279:role/OrganizationAccountAccessRole
+source_profile = default
+output = json
+duration_seconds = 3600
+
+# BigLySales Security Account
+[profile security]
+region = us-east-1
+role_arn = arn:aws:iam::562328446728:role/OrganizationAccountAccessRole
+source_profile = default
+output = json
+duration_seconds = 3600
+
+# BigLySales DR Account
+[profile dr]
+region = us-west-2
+role_arn = arn:aws:iam::987654321098:role/OrganizationAccountAccessRole
+source_profile = default
+external_id = biglysales-tfstate-replication-9a72b
+output = json
+duration_seconds = 3600
+
+# BigLySales DR S3 Replication Role
+[profile dr-replication]
+region = us-west-2
+role_arn = arn:aws:iam::987654321098:role/tfstate-replication-destination-role
+source_profile = default
+external_id = biglysales-tfstate-replication-9a72b
+output = json
+duration_seconds = 3600
+

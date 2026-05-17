@@ -65,5 +65,7 @@ This is the core architectural concept. There is **no static machine type file**
 | `~/.tmux.conf` | `dotfiles/tmux/.tmux.conf` |
 | `~/.gitconfig` | `dotfiles/git/.gitconfig.<machine-name>` |
 | `~/.ssh/config` | `dotfiles/ssh/config` |
+| `~/.aws/config` | `dotfiles/aws/config` |
+| `~/.kube/config` | `dotfiles/kube/config` |
 
 Before linking, existing files are backed up to `~/.dotfiles_backup/<timestamp>/`.
