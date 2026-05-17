@@ -1,6 +1,7 @@
 [user]
     name = Your VM Name
     email = your.vm@company.com
+    signingkey = ~/.ssh/id_linux-vm1.pub
 [core]
     environment = LANG=en_US
     editor = vim
@@ -11,3 +12,11 @@
     rebase = false
 [init]
     defaultBranch = main
+[commit]
+    gpgsign = true
+[tag]
+    gpgsign = true
+[gpg]
+    format = ssh
+[gpg "ssh"]
+    allowedSignersFile = ~/.ssh/allowed_signers

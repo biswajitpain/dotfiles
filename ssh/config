@@ -1,0 +1,13 @@
+Host *
+  UseKeychain yes
+  ServerAliveInterval 120
+  TCPKeepAlive yes
+  ForwardAgent yes
+  StrictHostKeyChecking no
+  AddKeysToAgent yes
+  HostkeyAlgorithms +ssh-rsa
+  PubkeyAcceptedAlgorithms +ssh-rsa
+  PubkeyAuthentication yes
+
+  IdentityFile ~/.ssh/id_rsa
+  IdentityFile ~/.ssh/id_biswajitpain_github
