@@ -68,9 +68,10 @@ esac
 # Load machine-specific configurations
 source_if_exists "$DOTFILES_DIR/zsh/machines/$MACHINE_TYPE.zsh"
 
-# Run the auto-update check in the background
+# Run the auto-update check silently in the background
 if [[ $- == *i* ]]; then
-    check_dotfiles_update &
+    check_dotfiles_update &>/dev/null &
+    disown
 fi
 
 # Your custom configurations below this line
