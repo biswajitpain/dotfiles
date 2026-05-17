@@ -80,3 +80,4 @@ alias path='echo -e ${PATH//:/\n}'
 # Reload zsh configuration
 alias reload='source ~/.zshrc'
 
+# my new alias
