@@ -21,6 +21,7 @@ source "$ZSH/oh-my-zsh.sh"
 # User configuration
 export LANG=en_US.UTF-8
 export EDITOR='vim'
+export GPG_TTY=$(tty)
 
 # Dotfiles directory
 export DOTFILES_DIR="$HOME/.dotfiles"
@@ -46,7 +47,9 @@ source_if_exists() {
 source_if_exists \
     "$DOTFILES_DIR/zsh/common/aliases/general.zsh" \
     "$DOTFILES_DIR/zsh/common/functions/utils.zsh" \
-    "$DOTFILES_DIR/zsh/common/functions/check_dotfiles_update.zsh"
+    "$DOTFILES_DIR/zsh/common/functions/codesign.zsh" \
+    "$DOTFILES_DIR/zsh/common/functions/check_dotfiles_update.zsh" \
+    "$DOTFILES_DIR/scripts/az-aliases.sh"
 
 # Load OS-specific aliases and functions
 case "$(uname)" in
