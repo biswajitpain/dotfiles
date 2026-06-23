@@ -70,8 +70,13 @@ source_if_exists "$DOTFILES_DIR/zsh/machines/$MACHINE_TYPE.zsh"
 
 # Run the auto-update check silently in the background
 if [[ $- == *i* ]]; then
-    check_dotfiles_update &>/dev/null &
+    { check_dotfiles_update &>/dev/null & } 2>/dev/null
     disown
 fi
 
 # Your custom configurations below this line
+export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
+
+test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
+
