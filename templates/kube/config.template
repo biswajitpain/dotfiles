@@ -1,0 +1,32 @@
+# kubeconfig — RENDERED FROM TEMPLATE, DO NOT COMMIT
+#
+# A kubeconfig is deliberately NOT templated with real values. Cluster endpoints,
+# CA data and any embedded tokens are environment traces (and sometimes outright
+# credentials), so this repo ships only the regeneration recipe. bootstrap.sh can
+# run these for you (`./bootstrap.sh --cloud`).
+#
+# Regenerate contexts from the source of truth instead of syncing a file:
+#
+#   EKS:
+#     aws eks update-kubeconfig --profile prod    --region {{AWS_REGION}} --name <cluster>
+#     aws eks update-kubeconfig --profile staging --region {{AWS_REGION}} --name <cluster>
+#     aws eks update-kubeconfig --profile shared  --region {{AWS_REGION}} --name <cluster>
+#
+#   AKS:
+#     az aks get-credentials --resource-group <rg> --name <cluster>
+#
+#   GKE:
+#     gcloud container clusters get-credentials <cluster> --region <region>
+#
+# Verify afterwards:
+#   kubectl config get-contexts
+#
+# This placeholder keeps `~/.kube/config` valid until you populate it.
+
+apiVersion: v1
+kind: Config
+preferences: {}
+clusters: []
+contexts: []
+users: []
+current-context: ""

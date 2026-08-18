@@ -1,0 +1,49 @@
+# Debian/Ubuntu packages installed by bootstrap.sh.
+# One per line. '#' comments and inline comments are stripped.
+#
+# Deliberately NOT here — distro versions lag badly or do not exist, so
+# bootstrap.sh installs these from vendor sources instead:
+#   node (nvm), go, java/corretto21, awscli v2, azure-cli, gcloud,
+#   kubectl, helm, terraform
+# See install_linux_languages() and install_linux_cloud_tools().
+
+# ── core shell environment ───────────────────────────────────────────────────
+git
+curl
+wget
+zsh
+vim
+tmux
+gawk
+unzip
+ca-certificates
+gnupg
+apt-transport-https
+
+# ── build basics (native deps for many tools) ────────────────────────────────
+build-essential
+pkg-config
+
+# ── languages / runtimes ─────────────────────────────────────────────────────
+python3
+python3-pip
+python3-venv
+pipx
+
+# ── kubernetes ───────────────────────────────────────────────────────────────
+kubectx          # provides kubectx + kubens on Debian/Ubuntu
+
+# ── data / text tools ────────────────────────────────────────────────────────
+jq
+ripgrep
+fd-find          # binary is 'fdfind'; languages.zsh aliases it to fd
+bat              # binary is 'batcat'; languages.zsh aliases it to bat
+fzf
+tree
+
+# ── git / dev workflow ───────────────────────────────────────────────────────
+direnv
+
+# ── ops / debugging ──────────────────────────────────────────────────────────
+htop
+httpie

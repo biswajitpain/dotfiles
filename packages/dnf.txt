@@ -1,0 +1,42 @@
+# Fedora/RHEL packages installed by bootstrap.sh.
+# One per line. '#' comments and inline comments are stripped.
+#
+# node, go, java/corretto21 and the cloud CLIs come from vendor sources —
+# see install_linux_languages() and install_linux_cloud_tools() in bootstrap.sh.
+
+# ── core shell environment ───────────────────────────────────────────────────
+git
+curl
+wget
+zsh
+vim
+tmux
+gawk
+unzip
+ca-certificates
+gnupg2
+
+# ── build basics ─────────────────────────────────────────────────────────────
+gcc
+make
+pkgconf-pkg-config
+
+# ── languages / runtimes ─────────────────────────────────────────────────────
+python3
+python3-pip
+pipx
+
+# ── data / text tools ────────────────────────────────────────────────────────
+jq
+ripgrep
+fd-find
+bat
+fzf
+tree
+
+# ── git / dev workflow ───────────────────────────────────────────────────────
+direnv
+
+# ── ops / debugging ──────────────────────────────────────────────────────────
+htop
+httpie

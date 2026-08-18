@@ -1,0 +1,74 @@
+# Homebrew FORMULAE installed by bootstrap.sh on macOS.
+# One per line. '#' comments and inline comments are stripped.
+#
+# Not here on purpose:
+#   node              -> installed via nvm (stage_node), so versions are switchable
+#   corretto@21       -> a cask, see packages/brew-cask-cli.txt
+#   google-cloud-sdk  -> a cask, see packages/brew-cask-cli.txt
+#   terraform         -> removed from homebrew-core after the BUSL license change;
+#                        bootstrap.sh taps hashicorp/tap and installs it there
+
+# ── core shell environment ───────────────────────────────────────────────────
+git
+curl
+wget
+zsh
+vim
+tmux
+coreutils
+gnu-sed
+gawk
+
+# ── languages / runtimes ─────────────────────────────────────────────────────
+go
+python@3.12
+pipx
+# java is Amazon Corretto 21 — see brew-cask-cli.txt
+
+# ── cloud CLIs ───────────────────────────────────────────────────────────────
+awscli
+azure-cli
+# gcloud is a cask — see brew-cask-cli.txt
+
+# ── infrastructure as code ───────────────────────────────────────────────────
+# terraform is NOT here: it left homebrew-core under the BUSL licence and comes
+# from hashicorp/tap (see bootstrap.sh). terragrunt is still core-licensed (MIT).
+terragrunt
+
+# ── kubernetes ───────────────────────────────────────────────────────────────
+kubernetes-cli
+kubectx
+helm
+kustomize
+stern
+k9s
+
+# ── data / text tools ────────────────────────────────────────────────────────
+jq
+yq
+ripgrep
+fd
+bat
+fzf
+eza
+tree
+sd
+
+# ── git / dev workflow ───────────────────────────────────────────────────────
+gh
+git-delta
+lazygit
+direnv
+zoxide
+
+# ── ops / debugging ──────────────────────────────────────────────────────────
+htop
+watch
+httpie
+dive
+tldr
+
+# ── security ─────────────────────────────────────────────────────────────────
+gnupg
+sops
+age

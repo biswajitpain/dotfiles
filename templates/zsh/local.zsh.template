@@ -1,0 +1,29 @@
+# ~/.dotfiles-local/zsh/local.zsh — local shell overrides, NEVER committed.
+#
+# Sourced last by .zshrc, so anything here overrides the tracked config.
+# This is where host-specific things belong: internal hostnames, jump hosts,
+# work directory layouts, per-employer paths, one-off aliases.
+#
+# Install:  cp templates/zsh/local.zsh.template ~/.dotfiles-local/zsh/local.zsh
+#
+# Matching SSH host definitions go in ~/.ssh/config.local (also untracked).
+
+# ── Example: internal dev hosts ──────────────────────────────────────────────
+# alias devbox="ssh devbox"
+# alias devsync="unison mysyncroot"
+#
+# # Forward a remote port to localhost: portfwd 8080
+# portfwd() {
+#     if [ $# -lt 1 ]; then
+#         echo "Usage: portfwd <port>" >&2
+#         return 1
+#     fi
+#     ssh -N -L "$1:localhost:$1" devbox
+# }
+
+# ── Example: work-specific paths ─────────────────────────────────────────────
+# export GOPATH="$HOME/work/go"
+# export PATH="$PATH:$HOME/.toolbox/bin"
+
+# ── Example: employer tooling ────────────────────────────────────────────────
+# export SOME_INTERNAL_ENDPOINT="https://internal.example.invalid"

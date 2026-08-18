@@ -1,13 +1,63 @@
+# SSH client configuration.
+#
+# Machine- and host-specific entries do NOT belong here — this file is tracked in
+# a public repo. Put internal hostnames, jump hosts and usernames in
+# ~/.ssh/config.local, which the Include below picks up and which is never
+# committed. bootstrap.sh creates it.
+#
+# Three previous settings were removed deliberately; see the notes below before
+# putting any of them back.
+
+Include ~/.ssh/config.local
+
 Host *
-  UseKeychain yes
-  ServerAliveInterval 120
-  TCPKeepAlive yes
-  ForwardAgent yes
-  StrictHostKeyChecking no
-  AddKeysToAgent yes
-  HostkeyAlgorithms +ssh-rsa
-  PubkeyAcceptedAlgorithms +ssh-rsa
+  # ── Host key verification ──────────────────────────────────────────────────
+  # Was: StrictHostKeyChecking no
+  # That accepts ANY host key without prompting, which silently defeats SSH's
+  # only protection against man-in-the-middle. "accept-new" keeps the
+  # convenience of not prompting for first contact, but still refuses to
+  # continue if a known host's key ever CHANGES — which is the case that matters.
+  StrictHostKeyChecking accept-new
+  UserKnownHostsFile ~/.ssh/known_hosts
+  HashKnownHosts yes
+
+  # ── Agent forwarding ───────────────────────────────────────────────────────
+  # Was: ForwardAgent yes  (under Host *)
+  # Forwarding the agent to EVERY host lets root on any box you connect to use
+  # your keys to authenticate onwards as you, for as long as the session lasts.
+  # Leave it off globally and enable per-host in ~/.ssh/config.local when you
+  # actually need it. Better still, use `ssh -A` for that one connection, or
+  # ProxyJump, which needs no forwarding at all.
+  ForwardAgent no
+
+  # ── Algorithms ─────────────────────────────────────────────────────────────
+  # Was: HostkeyAlgorithms +ssh-rsa / PubkeyAcceptedAlgorithms +ssh-rsa
+  # "ssh-rsa" is RSA with SHA-1. OpenSSH disabled it by default in 8.8 because
+  # SHA-1 collisions are practical. Re-enabling it globally weakens every
+  # connection to accommodate a few legacy servers. If you hit an old server,
+  # scope the exception to that host in ~/.ssh/config.local:
+  #
+  #   Host legacy-box
+  #     HostkeyAlgorithms +ssh-rsa
+  #     PubkeyAcceptedAlgorithms +ssh-rsa
+  #
   PubkeyAuthentication yes
 
+  # ── Keys ───────────────────────────────────────────────────────────────────
+  # IdentitiesOnly stops ssh offering every key in the agent to every server,
+  # which otherwise leaks which keys you hold and can trip per-account limits.
+  IdentitiesOnly yes
+  AddKeysToAgent yes
+  # Per-machine key, named by the machine key from scripts/detect-machine.sh, so
+  # one lost laptop is revocable on its own. Missing files are ignored silently.
+  IdentityFile ~/.ssh/id_ed25519
   IdentityFile ~/.ssh/id_rsa
-  IdentityFile ~/.ssh/id_biswajitpain_github
+
+  # ── Connection hygiene ─────────────────────────────────────────────────────
+  ServerAliveInterval 120
+  ServerAliveCountMax 3
+  TCPKeepAlive yes
+  ControlMaster auto
+  ControlPath ~/.ssh/cm-%r@%h:%p
+  ControlPersist 10m
+  Compression yes

@@ -1,0 +1,12 @@
+# Homebrew CASKS that are command-line tooling, not GUI apps.
+#
+# These are installed unconditionally, unlike packages/brew-cask.txt which is
+# GUI apps and sits behind a prompt. They live here only because Homebrew
+# distributes them as casks (JDKs and the gcloud bundle are not formulae).
+
+# Java — Amazon Corretto 21 (LTS). JAVA_HOME is wired up by
+# zsh/common/functions/languages.zsh.
+corretto@21
+
+# Google Cloud SDK — provides gcloud, gsutil, bq.
+google-cloud-sdk

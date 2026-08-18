@@ -1,0 +1,51 @@
+# Arch Linux packages installed by bootstrap.sh.
+# One per line. '#' comments and inline comments are stripped.
+#
+# Corretto is not in the official repos (it is in the AUR), and bootstrap.sh does
+# not shell out to an AUR helper — install java yourself, or use jdk21-openjdk.
+# node, go and the cloud CLIs come from vendor sources.
+
+# ── core shell environment ───────────────────────────────────────────────────
+git
+curl
+wget
+zsh
+vim
+tmux
+gawk
+unzip
+ca-certificates
+gnupg
+
+# ── build basics ─────────────────────────────────────────────────────────────
+base-devel
+
+# ── languages / runtimes ─────────────────────────────────────────────────────
+python
+python-pip
+go               # Arch's go is current, unlike Debian's
+
+# ── kubernetes ───────────────────────────────────────────────────────────────
+kubectl
+kubectx
+helm
+
+# ── data / text tools ────────────────────────────────────────────────────────
+jq
+ripgrep
+fd
+bat
+fzf
+eza
+tree
+
+# ── git / dev workflow ───────────────────────────────────────────────────────
+github-cli
+git-delta
+lazygit
+direnv
+zoxide
+
+# ── ops / debugging ──────────────────────────────────────────────────────────
+htop
+httpie

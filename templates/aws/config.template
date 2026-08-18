@@ -1,0 +1,65 @@
+# AWS CLI configuration — RENDERED FROM TEMPLATE, DO NOT COMMIT
+#
+# bootstrap.sh renders this into $DOTFILES_LOCAL_DIR/aws/config and symlinks
+# ~/.aws/config to it. The rendered file lives OUTSIDE the git repo on purpose:
+# account IDs, role ARNs and external IDs are infrastructure identifiers that do
+# not belong in a public repository.
+#
+# Access keys are NOT stored here — they belong in ~/.aws/credentials, or better,
+# use SSO / short-lived role credentials.
+#
+# Placeholders are substituted by bootstrap.sh. Anything left as {{...}} means you
+# skipped that prompt; re-run `./bootstrap.sh --cloud` to fill it in, or edit the
+# rendered file directly.
+
+[profile default]
+region = {{AWS_REGION}}
+output = json
+
+[profile management]
+region = {{AWS_REGION}}
+output = json
+
+[profile prod]
+region = {{AWS_REGION}}
+role_arn = arn:aws:iam::{{AWS_ACCOUNT_PROD}}:role/OrganizationAccountAccessRole
+source_profile = default
+output = json
+duration_seconds = 3600
+
+[profile shared]
+region = {{AWS_REGION}}
+role_arn = arn:aws:iam::{{AWS_ACCOUNT_SHARED}}:role/OrganizationAccountAccessRole
+source_profile = default
+output = json
+duration_seconds = 3600
+
+[profile staging]
+region = {{AWS_REGION}}
+role_arn = arn:aws:iam::{{AWS_ACCOUNT_STAGING}}:role/OrganizationAccountAccessRole
+source_profile = default
+output = json
+duration_seconds = 3600
+
+[profile security]
+region = {{AWS_REGION}}
+role_arn = arn:aws:iam::{{AWS_ACCOUNT_SECURITY}}:role/OrganizationAccountAccessRole
+source_profile = default
+output = json
+duration_seconds = 3600
+
+[profile dr]
+region = {{AWS_REGION_DR}}
+role_arn = arn:aws:iam::{{AWS_ACCOUNT_DR}}:role/OrganizationAccountAccessRole
+source_profile = default
+external_id = {{AWS_EXTERNAL_ID_DR}}
+output = json
+duration_seconds = 3600
+
+[profile dr-replication]
+region = {{AWS_REGION_DR}}
+role_arn = arn:aws:iam::{{AWS_ACCOUNT_DR}}:role/tfstate-replication-destination-role
+source_profile = default
+external_id = {{AWS_EXTERNAL_ID_DR}}
+output = json
+duration_seconds = 3600
