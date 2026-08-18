@@ -48,10 +48,10 @@ Host *
   # which otherwise leaks which keys you hold and can trip per-account limits.
   IdentitiesOnly yes
   AddKeysToAgent yes
-  # Per-machine key, named by the machine key from scripts/detect-machine.sh, so
-  # one lost laptop is revocable on its own. Missing files are ignored silently.
-  IdentityFile ~/.ssh/id_ed25519
-  IdentityFile ~/.ssh/id_rsa
+  # No IdentityFile here on purpose. Identities are machine-specific, so they are
+  # declared in ~/.ssh/config.local (untracked), which bootstrap generates. Naming
+  # generic id_ed25519/id_rsa here just added two dead lookups per connection on
+  # any machine whose keys are named descriptively.
 
   # ── Connection hygiene ─────────────────────────────────────────────────────
   ServerAliveInterval 120
