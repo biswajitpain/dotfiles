@@ -70,7 +70,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/biswajitpain/dotfiles/ma
 ```
 
 **What it does:**
-1. Detects the machine name automatically (`scutil --get ComputerName` on macOS, `hostname -s` on Linux)
+1. Detects the machine key automatically via `scripts/detect-machine.sh` (salted hash of the hardware serial)
 2. Checks and installs dependencies: `git`, `curl`, `zsh`, `vim`, `tmux`
 3. Installs Oh My Zsh (if not already present)
 4. Backs up any existing dotfiles to `~/.dotfiles_backup/<timestamp>/`
@@ -142,12 +142,22 @@ reload
 
 ### Machine Detection
 
-Machine identity is resolved **at shell startup, every time** — there is no stored machine type file. The logic in `.zshrc`:
+Machine identity is resolved **at shell startup, every time** — there is no stored machine type file. The logic lives in one place, `scripts/detect-machine.sh`, which both `.zshrc` and `install.sh` call so they cannot disagree.
+
+The canonical key is a salted SHA-256 prefix of the hardware serial (12 hex chars):
 
 ```
-macOS  →  scutil --get ComputerName
-Linux  →  hostname -s
+macOS  →  ioreg -c IOPlatformExpertDevice   (serial)
+Linux  →  /sys/class/dmi/id/product_serial, else /etc/machine-id
+         ↓
+   sha256("<salt>:<serial>")  →  first 12 hex  →  78827b30ddc1
+         ↓
+   prefix with LocalHostName / hostname -s   →  pro-78827b30ddc1
 ```
+
+The hash is the identity; the hostname prefix is only a human label. Lookup
+matches the hash **suffix** (`*-<hash>.zsh`), so renaming the prefix — or the
+host — never orphans a machine's config.
 
 The result is exported as `$MACHINE_TYPE` and used to load the matching file:
 
@@ -155,10 +165,24 @@ The result is exported as `$MACHINE_TYPE` and used to load the matching file:
 zsh/machines/$MACHINE_TYPE.zsh
 ```
 
-If no matching file exists, it is silently skipped — no errors.
+**Why a hash and not the serial itself?** This repository is public, and a serial number
+is a permanent identifier you cannot rotate — it is a useful lever for social-engineering
+Apple Support and it reveals the exact model and build. Hashing keeps the key stable and
+unique without publishing the serial. The salt is committed here, so it is *not* a secret;
+it only prevents the key being a bare hash that a generic precomputed table would resolve.
 
-> To find your machine name on macOS: `scutil --get ComputerName`  
-> To find your machine name on Linux: `hostname -s`
+**Why not `ComputerName`?** It is user-editable, it disagrees with `LocalHostName`, and on
+the personal MacBook it returns `Biswajit’s MacBook Pro` — spaces plus a curly apostrophe
+(U+2019), which is a poor filename and left stray untracked files behind.
+
+**Legacy fallback.** If no file matches the canonical key, `.zshrc` then tries the machine's
+older names (`ComputerName`, then `hostname -s`). An unmigrated machine therefore keeps
+loading its config instead of silently losing it. `$MACHINE_CONFIG` records which name won.
+
+Setting `MACHINE_TYPE` in the environment overrides everything.
+
+> To find your machine key on any machine: `machine-info`
+> (or `./scripts/detect-machine.sh --explain`)
 
 ---
 
@@ -173,7 +197,7 @@ Every interactive shell loads files in this sequence:
 | 3 | `zsh/common/functions/utils.zsh` | Cross-machine utility functions |
 | 4 | `zsh/common/functions/check_dotfiles_update.zsh` | Weekly auto-update check |
 | 5 | `zsh/os/macos/` or `zsh/os/linux/` | OS-specific aliases and functions |
-| 6 | `zsh/machines/$MACHINE_TYPE.zsh` | Machine-specific overrides |
+| 6 | `zsh/machines/$MACHINE_TYPE.zsh` | Machine-specific overrides (falls back to legacy names) |
 
 Each file is loaded only if it exists. Later files can override anything from earlier ones.
 
@@ -645,11 +669,13 @@ digns_server mysite.com 1.1.1.1         # query Cloudflare specifically
 
 ### Adding a New Machine
 
-1. Find your machine name:
+1. Find your machine key:
    ```bash
-   scutil --get ComputerName   # macOS
-   hostname -s                 # Linux
+   machine-info                        # full breakdown
+   ./scripts/detect-machine.sh         # just the key, e.g. 78827b30ddc1
    ```
+   Name the file after that key. Add a comment identifying the machine in human
+   terms, since the key is opaque — but do **not** record the serial in the file.
 
 2. Create the machine config file using `dummy-machine.zsh` as a template:
    ```bash
@@ -696,9 +722,69 @@ The file is then symlinked to `~/.gitconfig`.
 
 | Problem | Diagnosis | Fix |
 |---|---|---|
-| Machine-specific config not loading | `echo $MACHINE_TYPE` — check the value | Ensure `zsh/machines/$MACHINE_TYPE.zsh` exists with that exact name |
+| Machine-specific config not loading | `machine-info` — compare `canonical key` with `config loaded` | Ensure `zsh/machines/<canonical key>.zsh` exists; `machine-info` prints the `mv` command if a legacy name was used |
 | Wrong git identity | `git config user.email` | Check `git/.gitconfig.<machine-name>` and re-run `./install.sh local` |
 | zsh not default shell | `echo $SHELL` — not `/bin/zsh` | Run `chsh -s $(which zsh)` then log out and back in |
 | Symlink broken / pointing nowhere | `ls -la ~/.zshrc` | Re-run `./install.sh local` — it will back up and relink |
 | Auto-update not running | `.last_update` may be recent | Delete `~/.dotfiles/.last_update` and open a new shell |
 | Oh My Zsh not found | Shell errors on startup | Run `./install.sh local` — it installs Oh My Zsh if missing |
+
+
+---
+
+## Purging a leaked file from history
+
+`git rm --cached` removes a file from the *current* commit only. Every earlier
+commit still contains it, and on a public repo it stays fetchable — including
+from forks and from GitHub's cached views. Untracking is necessary but not
+sufficient.
+
+**Order matters. Rotate first, rewrite second.** A rewrite takes time and can be
+undone by anyone holding an old clone; rotation is what actually ends the
+exposure.
+
+### 1. Rotate what leaked
+
+| Leaked | Action |
+|---|---|
+| AWS ExternalId | Generate a new one and update the trust policy on both the role and the calling side. The old value is public. |
+| AWS account IDs, role ARNs | Cannot be rotated. Treat as known: confirm every trust policy requires an ExternalId or a specific principal, and that no role is assumable by `*`. |
+| Kubeconfig CA data | Not secret by itself, but confirm the API endpoints are not publicly reachable, or are IP-restricted. |
+| Azure subscription/tenant GUIDs | Cannot be rotated. Identifiers only; ensure no RBAC grant depends on obscurity. |
+
+### 2. Rewrite history
+
+`git filter-repo` is the supported tool (`git filter-branch` is deprecated):
+
+```bash
+brew install git-filter-repo          # or: pipx install git-filter-repo
+
+cd ~/.dotfiles
+git clone --mirror . ../dotfiles-backup.git   # keep a way back
+
+git filter-repo --invert-paths \
+    --path aws/config \
+    --path kube/config
+
+git push --force --all
+git push --force --tags
+```
+
+### 3. Understand what a rewrite does not fix
+
+- Every existing clone still has the old objects.
+- GitHub keeps unreachable objects until a manual GC; open a support request to
+  purge cached views if it matters.
+- Forks are separate repositories and are not rewritten. Check for them first.
+- Every commit SHA after the rewritten point changes, so open PRs and anything
+  pinning a SHA will break.
+
+### 4. Verify
+
+```bash
+./scripts/audit-repo.sh --history
+```
+
+Expect two known false positives: the all-zeros placeholder GUID in
+`config/azure-subscriptions.env.template`, and the pattern strings inside
+`git/hooks/pre-commit`.

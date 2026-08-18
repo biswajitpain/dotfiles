@@ -1,0 +1,41 @@
+# Git configuration — RENDERED FROM TEMPLATE, DO NOT COMMIT
+#
+# bootstrap.sh renders this into $DOTFILES_LOCAL_DIR/git/gitconfig and symlinks
+# ~/.gitconfig to it. Kept out of the repo so identities and per-machine signing
+# keys leave no trace in a public repository.
+
+[user]
+	name = {{GIT_NAME}}
+	email = {{GIT_EMAIL}}
+	signingkey = {{GIT_SIGNING_KEY}}
+
+[core]
+	editor = vim
+	hooksPath = {{DOTFILES_DIR}}/git/hooks
+
+[color]
+	ui = auto
+
+[pull]
+	rebase = false
+
+[init]
+	defaultBranch = main
+
+[gpg]
+	format = ssh
+
+[gpg "ssh"]
+	allowedSignersFile = {{GIT_ALLOWED_SIGNERS}}
+
+[commit]
+	gpgsign = {{GIT_GPGSIGN}}
+
+[tag]
+	gpgsign = {{GIT_GPGSIGN}}
+
+[fetch]
+	prune = true
+
+[diff]
+	colorMoved = zebra

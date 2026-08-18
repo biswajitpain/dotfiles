@@ -1,0 +1,9 @@
+# Homebrew casks (GUI apps) installed by bootstrap.sh on macOS.
+# Skipped unless you answer yes to the GUI apps prompt, or pass --casks.
+# One per line. '#' comments and blank lines ignored.
+
+iterm2
+visual-studio-code
+sublime-text
+docker
+rectangle

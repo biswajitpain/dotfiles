@@ -252,3 +252,42 @@ getcertnames() {
         awk '/X509v3 Subject Alternative Name/ {getline; print}' | \
         sed -e 's/DNS://g' -e 's/ //g' | tr ',' '\n'
 }
+
+# machine-info: Show how this machine is identified by the dotfiles
+# Usage: machine-info
+# Description: Prints the canonical machine key (a salted hash of the hardware
+# serial), which machine/gitconfig files it maps to, and whether the config that
+# actually loaded came from the canonical key or a legacy fallback name. Run this
+# on a new machine to learn the filename to create. Note it prints the raw serial
+# locally — do not paste the output into anything public.
+machine-info() {
+    "$DOTFILES_DIR/scripts/detect-machine.sh" --explain
+
+    printf 'exported key  : %s\n' "${MACHINE_TYPE:-(unset)}"
+    printf 'config loaded : %s\n' "${MACHINE_CONFIG:-(none — no machines/ file matched)}"
+
+    local canonical hash
+    canonical=$(MACHINE_TYPE="" "$DOTFILES_DIR/scripts/detect-machine.sh")
+    hash=$("$DOTFILES_DIR/scripts/detect-machine.sh" --hash 2>/dev/null)
+
+    [ -n "$MACHINE_CONFIG" ] || {
+        printf 'status        : no machine file yet. Create:\n'
+        printf '  %s/zsh/machines/%s.zsh\n' "$DOTFILES_DIR" "$canonical"
+        return 0
+    }
+
+    if [ "$MACHINE_CONFIG" = "$canonical" ]; then
+        printf 'status        : canonical name — nothing to do\n'
+    elif [ -n "$hash" ] && [[ "$MACHINE_CONFIG" == *"-$hash" ]]; then
+        # Same machine, different human prefix. Matched on the hash suffix, which
+        # is exactly what that design is for — not drift, so no warning.
+        printf 'status        : matched by hash suffix (prefix "%s" differs from current host "%s")\n' \
+            "${MACHINE_CONFIG%-$hash}" "$(printf '%s' "$canonical" | sed "s/-$hash\$//")"
+        printf '                rename to %s.zsh if you want the prefix to track the hostname\n' "$canonical"
+    else
+        # Bare-hash or pre-hash hostname filename — worth migrating.
+        warn "Loaded via an older name '$MACHINE_CONFIG'. To migrate:"
+        printf '  mv %s/zsh/machines/%s.zsh %s/zsh/machines/%s.zsh\n' \
+            "$DOTFILES_DIR" "$MACHINE_CONFIG" "$DOTFILES_DIR" "$canonical"
+    fi
+}

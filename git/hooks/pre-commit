@@ -44,7 +44,11 @@ for file in $(staged_files); do
 done
 
 # ── 2. Block private SSH / TLS key content ───────────────────────────────────
-PRIVATE_KEY_PATTERN='-----BEGIN .* PRIVATE KEY-----'
+# Anchored to the start of the line. A real PEM block begins at column 0, which in
+# a diff is "+-----BEGIN ...". Prose that merely mentions the marker is always
+# prefixed (e.g. a markdown bullet "- `-----BEGIN ... `"), so anchoring keeps this
+# rule active inside documentation instead of having to exempt docs wholesale.
+PRIVATE_KEY_PATTERN='^\+?-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----'
 
 for file in $(staged_files); do
     if git diff --cached -- "$file" | grep -qE -- "$PRIVATE_KEY_PATTERN"; then
@@ -59,6 +63,11 @@ done
 SECRET_CONTENT_PATTERN='(API_KEY|API_SECRET|ACCESS_TOKEN|SECRET_KEY|AUTH_TOKEN|PRIVATE_KEY|PASSWORD|PASSWD|AZ_SUB_[A-Z_]+=")[^"]{8,}"'
 
 for file in $(staged_files); do
+    # scripts/audit-repo.sh is a list of secret patterns by construction; rule 4c
+    # already exempts it and this rule must agree, or the scanner blocks itself.
+    if echo "$file" | grep -qE '^scripts/audit-repo\.sh$'; then
+        continue
+    fi
     if git diff --cached -- "$file" | grep -qE "$SECRET_CONTENT_PATTERN"; then
         echo -e "${RED}[SECRET BLOCK]${NC} Possible secret value detected in: $file"
         echo -e "${YELLOW}  If this is a false positive, use: git commit --no-verify${NC}"
@@ -73,6 +82,54 @@ for file in $(staged_files); do
         echo -e "${RED}[SECRET BLOCK]${NC} Possible SSH private key file: $file"
         FAILED=1
     fi
+done
+
+# ── 4b. Block credential-bearing config paths outright ───────────────────────
+# These belong in $DOTFILES_LOCAL_DIR (outside the repo), never here. The
+# absence of this rule is what let aws/config and kube/config get committed.
+FORBIDDEN_PATHS=(
+    '^aws/config$'
+    '^aws/credentials$'
+    '^kube/config$'
+    '^config/azure-subscriptions\.env$'
+    '^git/\.gitconfig\.[^.]*$'   # per-machine identities; *.template is fine
+)
+
+for file in $(staged_files); do
+    for pattern in "${FORBIDDEN_PATHS[@]}"; do
+        if echo "$file" | grep -qE "$pattern"; then
+            echo -e "${RED}[SECRET BLOCK]${NC} $file must not be tracked — it belongs in \$DOTFILES_LOCAL_DIR"
+            echo -e "${YELLOW}  Commit a templates/ version instead; bootstrap.sh renders the real file.${NC}"
+            FAILED=1
+        fi
+    done
+done
+
+# ── 4c. Block cloud infrastructure identifiers ───────────────────────────────
+# Account IDs, role ARNs, external IDs and cluster endpoints are environment
+# traces even when they are not strictly credentials.
+INFRA_PATTERNS=(
+    'AKIA[0-9A-Z]{16}'
+    'aws_secret_access_key[[:space:]]*='
+    'arn:aws[a-z-]*:[a-z0-9-]*:[a-z0-9-]*:[0-9]{12}:'
+    'external_id[[:space:]]*=[[:space:]]*[A-Za-z0-9._-]{8,}'
+    'certificate-authority-data:[[:space:]]*[A-Za-z0-9+/=]{40,}'
+    'client-(certificate|key)-data:[[:space:]]*[A-Za-z0-9+/=]{40,}'
+    'server:[[:space:]]*https?://[A-Za-z0-9.-]+'
+)
+
+for file in $(staged_files); do
+    # Templates, docs and the audit script legitimately show pattern shapes.
+    if echo "$file" | grep -qE '\.template$|^DOCS\.md$|^CLAUDE\.md$|^README\.md$|^scripts/audit-repo\.sh$'; then
+        continue
+    fi
+    for pattern in "${INFRA_PATTERNS[@]}"; do
+        if git diff --cached -- "$file" | grep -qE -- "$pattern"; then
+            echo -e "${RED}[SECRET BLOCK]${NC} cloud infrastructure identifier in: $file"
+            echo -e "${YELLOW}  Matched: $pattern${NC}"
+            FAILED=1
+        fi
+    done
 done
 
 # ── 5. Warn on .env.template files that contain real-looking values ───────────

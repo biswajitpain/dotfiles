@@ -1,10 +1,46 @@
+# ── Local state ──────────────────────────────────────────────────────────────
 .last_update
+.update_notice
 .machine_type
-gitconfig.office-mac1
 .claude/
-config/azure/
-config/azure-subscriptions.env
+*.bak
+*.bak.*
+
+# ── Credential-bearing config: DENY BY DEFAULT, templates only ───────────────
+#
+# The repo holds templates. Real configs are rendered by bootstrap.sh into
+# $DOTFILES_LOCAL_DIR (~/.dotfiles-local), outside this repo entirely — so a
+# mistake in here cannot leak them.
+#
+# Do NOT add '!aws/config'-style re-includes. Account IDs, role ARNs, external
+# IDs and cluster endpoints are exactly what must stay out.
+# scripts/audit-repo.sh fails if such a rule reappears.
+
 aws/*
-!aws/config
+!aws/*.template
+
 kube/*
-!kube/config
+!kube/*.template
+
+config/*
+!config/*.template
+
+# Per-machine git identities are rendered, not tracked.
+git/.gitconfig.*
+!git/.gitconfig.*.template
+
+# ── Secrets, belt and braces ─────────────────────────────────────────────────
+*.pem
+*.p12
+*.pfx
+*.keystore
+.env
+.env.*
+!.env.template
+credentials
+credentials.json
+secrets.json
+id_rsa
+id_ed25519
+id_ecdsa
+allowed_signers

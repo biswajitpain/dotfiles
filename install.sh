@@ -3,7 +3,10 @@
 set -e
 
 DOTFILES_REPO="https://github.com/biswajitpain/dotfiles.git"
-DOTFILES_DIR="$HOME/.dotfiles"
+DOTFILES_DIR="${DOTFILES_DIR:-$HOME/.dotfiles}"
+# Rendered, credential-bearing configs live here — OUTSIDE the repo, so no
+# .gitignore mistake can publish them. See bootstrap.sh.
+DOTFILES_LOCAL_DIR="${DOTFILES_LOCAL_DIR:-$HOME/.dotfiles-local}"
 BACKUP_DIR="$HOME/.dotfiles_backup/$(date +%Y%m%d_%H%M%S)"
 
 # Colors for output
@@ -90,73 +93,34 @@ link_file() {
     fi
 }
 
-# Set up Git configuration
+# Set up Git configuration.
+#
+# The rendered gitconfig lives in $DOTFILES_LOCAL_DIR, never in the repo: it
+# carries an identity and a per-machine signing key path. bootstrap.sh owns
+# creating it interactively (`./bootstrap.sh --only identity`); install.sh only
+# links an existing one, so re-running install.sh never clobbers your identity.
 setup_git_config() {
-    local git_config_file="$DOTFILES_DIR/git/.gitconfig.$MACHINE_NAME"
-    
-    if [ ! -f "$git_config_file" ]; then
-        warn "Git config for $MACHINE_NAME not found. Creating a new one."
-        read -p "Enter your Git user name: " git_name
-        read -p "Enter your Git email: " git_email
-        
-        # Detect SSH signing key: prefer machine-specific, fall back to shared key
-        local machine_key="$HOME/.ssh/id_${MACHINE_NAME}.pub"
-        local fallback_key="$HOME/.ssh/id_biswajitpain_github.pub"
-        local signing_key=""
-        if [ -f "$machine_key" ]; then
-            signing_key="~/.ssh/id_${MACHINE_NAME}.pub"
-        elif [ -f "$fallback_key" ]; then
-            signing_key="~/.ssh/id_biswajitpain_github.pub"
-        fi
+    local git_config_file="$DOTFILES_LOCAL_DIR/git/gitconfig"
 
-        if [ -n "$signing_key" ]; then
-            cat > "$git_config_file" <<EOL
-[user]
-    name = $git_name
-    email = $git_email
-    signingkey = $signing_key
-[core]
-    editor = vim
-[color]
-    ui = auto
-[pull]
-    rebase = false
-[init]
-    defaultBranch = main
-[gpg]
-    format = ssh
-[commit]
-    gpgsign = true
-[tag]
-    gpgsign = true
-[gpg "ssh"]
-    allowedSignersFile = ~/.ssh/allowed_signers
-EOL
-            log "SSH signing configured with key: $signing_key"
+    if [ ! -f "$git_config_file" ]; then
+        # Migrate a pre-existing in-repo config if one is still lying around.
+        local legacy="$DOTFILES_DIR/git/.gitconfig.$MACHINE_NAME"
+        if [ -f "$legacy" ]; then
+            warn "Migrating in-repo git config out of the repository..."
+            mkdir -p "$DOTFILES_LOCAL_DIR/git"
+            chmod 700 "$DOTFILES_LOCAL_DIR"
+            cp "$legacy" "$git_config_file"
+            chmod 600 "$git_config_file"
+            log "Moved to $git_config_file — delete $legacy once you have verified it"
         else
-            warn "No SSH key found at $machine_key or $fallback_key — signing disabled."
-            cat > "$git_config_file" <<EOL
-[user]
-    name = $git_name
-    email = $git_email
-[core]
-    editor = vim
-[color]
-    ui = auto
-[pull]
-    rebase = false
-[init]
-    defaultBranch = main
-[commit]
-    gpgsign = false
-EOL
+            warn "No git config yet. Run: ./bootstrap.sh --only identity"
+            return 0
         fi
     fi
 
-    # Backup existing .gitconfig before creating new symlink
     backup_file "$HOME/.gitconfig"
     link_file "$git_config_file" "$HOME/.gitconfig"
-    log "Git config set up for $MACHINE_NAME"
+    log "Git config linked for $MACHINE_NAME"
 }
 
 # Set up SSH commit signing
@@ -263,17 +227,8 @@ main() {
         esac
     done
 
-    if [ -z "$MACHINE_NAME" ]; then
-        log "Machine name not provided, detecting automatically..."
-        if [[ "$(uname)" == "Darwin" ]]; then
-            MACHINE_NAME=$(scutil --get ComputerName)
-        else
-            MACHINE_NAME=$(hostname -s 2>/dev/null || hostname 2>/dev/null || echo "default")
-        fi
-        log "Detected machine name: $MACHINE_NAME"
-    fi
-
-    log "Setting up dotfiles for machine: $MACHINE_NAME"
+    # Machine detection is deliberately deferred until after the clone/update
+    # below: on a fresh install scripts/detect-machine.sh does not exist yet.
 
     if [ "$USE_LOCAL" = false ]; then
         if [ ! -d "$DOTFILES_DIR" ]; then
@@ -301,6 +256,25 @@ main() {
         log "Performing a dry run using local dotfiles directory..."
     fi
 
+    # Resolve the machine key using the same logic .zshrc uses, so the two can
+    # never disagree about which machines/ and .gitconfig.* files apply.
+    if [ -z "$MACHINE_NAME" ]; then
+        local detector="$DOTFILES_DIR/scripts/detect-machine.sh"
+        if [ -x "$detector" ]; then
+            log "Machine name not provided, detecting automatically..."
+            MACHINE_NAME=$(MACHINE_TYPE="" "$detector")
+        elif [ -f "$detector" ]; then
+            log "Machine name not provided, detecting automatically..."
+            MACHINE_NAME=$(MACHINE_TYPE="" sh "$detector")
+        else
+            warn "detect-machine.sh not found — falling back to hostname."
+            MACHINE_NAME=$(hostname -s 2>/dev/null || hostname 2>/dev/null || echo "default")
+        fi
+        log "Detected machine name: $MACHINE_NAME"
+    fi
+
+    log "Setting up dotfiles for machine: $MACHINE_NAME"
+
     check_dependencies
     install_oh_my_zsh
     
@@ -321,13 +295,25 @@ main() {
     link_file "$DOTFILES_DIR/ssh/config" "$HOME/.ssh/config"
     chmod 600 "$DOTFILES_DIR/ssh/config"
 
-    mkdir -p "$HOME/.aws"
-    backup_file "$HOME/.aws/config"
-    link_file "$DOTFILES_DIR/aws/config" "$HOME/.aws/config"
+    # aws/kube configs are NOT in this repo — they carry account IDs, role ARNs,
+    # external IDs and cluster endpoints. bootstrap.sh renders them from
+    # templates/ into $DOTFILES_LOCAL_DIR, outside the repo. Link only if the
+    # rendered file already exists; otherwise point the user at bootstrap.
+    if [ -f "$DOTFILES_LOCAL_DIR/aws/config" ]; then
+        mkdir -p "$HOME/.aws"
+        backup_file "$HOME/.aws/config"
+        link_file "$DOTFILES_LOCAL_DIR/aws/config" "$HOME/.aws/config"
+    else
+        warn "No rendered AWS config. Run: ./bootstrap.sh --only cloud"
+    fi
 
-    mkdir -p "$HOME/.kube"
-    backup_file "$HOME/.kube/config"
-    link_file "$DOTFILES_DIR/kube/config" "$HOME/.kube/config"
+    if [ -f "$DOTFILES_LOCAL_DIR/kube/config" ]; then
+        mkdir -p "$HOME/.kube"
+        backup_file "$HOME/.kube/config"
+        link_file "$DOTFILES_LOCAL_DIR/kube/config" "$HOME/.kube/config"
+    else
+        warn "No rendered kubeconfig. Run: ./bootstrap.sh --only cloud"
+    fi
 
     setup_git_config
 
