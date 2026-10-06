@@ -1100,6 +1100,16 @@ stage_verify() {
             printf '  %-16s    (missing)\n' "$label"
         fi
     done
+    # bootstrap runs in bash, before any zsh PATH setup (languages.zsh, nvm init
+    # in the machine file). Mirror those locations so tools installed moments
+    # ago are not misreported as missing.
+    local d
+    for d in /usr/local/go/bin "$HOME/go/bin" "$HOME/.local/bin"; do
+        [ -d "$d" ] || continue
+        case ":$PATH:" in *":$d:"*) ;; *) PATH="$d:$PATH" ;; esac
+    done
+    # shellcheck disable=SC1091
+    [ -s "$HOME/.nvm/nvm.sh" ] && . "$HOME/.nvm/nvm.sh" >/dev/null 2>&1
     printf "\n${BLUE}Toolchain${NC}\n"
     local b missing=0
     for b in git zsh vim tmux jq \
