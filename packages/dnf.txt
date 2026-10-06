@@ -35,6 +35,8 @@ fzf
 tree
 
 # ── git / dev workflow ───────────────────────────────────────────────────────
+# gh (GitHub CLI) is NOT here: it comes from GitHub's own dnf repository —
+# see install_linux_cloud_tools() in bootstrap.sh.
 direnv
 
 # ── ops / debugging ──────────────────────────────────────────────────────────

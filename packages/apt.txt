@@ -32,6 +32,8 @@ pipx
 
 # ── kubernetes ───────────────────────────────────────────────────────────────
 kubectx          # provides kubectx + kubens on Debian/Ubuntu
+kustomize
+# k9s, stern: no Debian package — install_linux_extras() in bootstrap.sh
 
 # ── data / text tools ────────────────────────────────────────────────────────
 jq
@@ -40,10 +42,29 @@ fd-find          # binary is 'fdfind'; languages.zsh aliases it to fd
 bat              # binary is 'batcat'; languages.zsh aliases it to bat
 fzf
 tree
+eza
+sd
+# yq is NOT here: Debian's "yq" is a Python jq wrapper, not mikefarah/yq.
+# bootstrap.sh installs the real one in install_linux_extras().
 
 # ── git / dev workflow ───────────────────────────────────────────────────────
+# gh (GitHub CLI) is NOT here: not in Debian's repos. bootstrap.sh installs it
+# from GitHub's own apt repository — see install_linux_cloud_tools().
 direnv
+git-delta
+git-filter-repo
+lazygit
+zoxide
+shellcheck
 
 # ── ops / debugging ──────────────────────────────────────────────────────────
 htop
 httpie
+procps           # provides watch
+tealdeer         # tldr client
+default-mysql-client
+# dive, cloudflared: install_linux_extras() in bootstrap.sh
+
+# ── security ─────────────────────────────────────────────────────────────────
+age
+# sops: install_linux_extras() in bootstrap.sh

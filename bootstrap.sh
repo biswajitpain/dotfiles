@@ -287,10 +287,21 @@ stage_packages() {
             # shellcheck disable=SC2086
             if [ -n "$pkgs" ]; then
                 # shellcheck disable=SC2086
-                $SUDO apt-get install -y $pkgs || warn "some packages failed; continuing"
+                # One bulk call is fast, but apt aborts the WHOLE batch if a
+                # single name is unknown (newer tools such as eza or lazygit are
+                # missing on older Debian/Ubuntu). On failure, retry one by one
+                # so one absent package cannot cost every other.
+                if ! $SUDO apt-get install -y $pkgs; then
+                    warn "bulk apt install failed; retrying packages individually"
+                    local p
+                    for p in $pkgs; do
+                        $SUDO apt-get install -y "$p" >/dev/null 2>&1 || warn "apt: $p unavailable"
+                    done
+                fi
             fi
             install_linux_languages
             install_linux_cloud_tools
+            install_linux_extras
             ;;
         dnf)
             need_sudo
@@ -302,6 +313,7 @@ stage_packages() {
             fi
             install_linux_languages
             install_linux_cloud_tools
+            install_linux_extras
             ;;
         pacman)
             need_sudo
@@ -313,6 +325,7 @@ stage_packages() {
             fi
             install_linux_languages
             install_linux_cloud_tools
+            install_linux_extras
             ;;
         *)
             warn "no supported package manager detected — skipping package install"
@@ -474,6 +487,34 @@ REPO
             || warn "kubectx install failed"
     fi
 
+    # ── GitHub CLI ───────────────────────────────────────────────────────────
+    # Not in Debian's repos (and lags in others), so use GitHub's own apt/dnf
+    # repository. It is in brew.txt on macOS and pacman.txt on Arch.
+    if ! command -v gh >/dev/null 2>&1; then
+        log "installing GitHub CLI"
+        case "$PKG" in
+            apt)
+                if curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+                        | $SUDO dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg status=none; then
+                    $SUDO chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+                    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+                        | $SUDO tee /etc/apt/sources.list.d/github-cli.list >/dev/null
+                    $SUDO apt-get update -qq && $SUDO apt-get install -y gh \
+                        || warn "gh install failed"
+                else
+                    warn "could not add the GitHub CLI apt key"
+                fi
+                ;;
+            dnf)
+                $SUDO dnf install -y 'dnf-command(config-manager)' >/dev/null 2>&1
+                $SUDO dnf config-manager addrepo --from-repofile=https://cli.github.com/packages/rpm/gh-cli.repo >/dev/null 2>&1 \
+                    || $SUDO dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo >/dev/null 2>&1
+                $SUDO dnf install -y gh --repo gh-cli || $SUDO dnf install -y gh || warn "gh install failed"
+                ;;
+            *)  warn "no GitHub CLI recipe for $PKG — see https://github.com/cli/cli#installation" ;;
+        esac
+    fi
+
     # ── terragrunt ───────────────────────────────────────────────────────────
     # Not packaged by apt/dnf/pacman. It is a single static Go binary, so take the
     # release asset directly. Pinned to the API's "latest" tag rather than a
@@ -525,6 +566,113 @@ REPO
                 ;;
             *) warn "no terraform recipe for $PKG — see https://developer.hashicorp.com/terraform/install" ;;
         esac
+    fi
+}
+
+# gh_latest_tag <owner/repo> -> echoes the latest release tag, e.g. v1.2.3
+gh_latest_tag() {
+    curl -fsSL "https://api.github.com/repos/$1/releases/latest" 2>/dev/null \
+        | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1
+}
+
+# Dev tools the Mac gets from Homebrew (brew.txt) that have no usable distro
+# package on Linux. Static release binaries from upstream, each guarded so a
+# re-run is a no-op. yq here is mikefarah/yq (Go) — Debian's "yq" package is an
+# unrelated Python jq wrapper with different syntax, so it is deliberately not
+# in apt.txt.
+install_linux_extras() {
+    local garch="amd64"; [ "$(uname -m)" = "aarch64" ] && garch="arm64"
+    local tmp tag
+
+    if ! command -v yq >/dev/null 2>&1 || ! yq --version 2>&1 | grep -q mikefarah; then
+        log "installing yq (mikefarah)"
+        curl -fsSL "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${garch}" -o /tmp/yq \
+            && $SUDO install -m 0755 /tmp/yq /usr/local/bin/yq || warn "yq install failed"
+        rm -f /tmp/yq
+    fi
+
+    if ! command -v k9s >/dev/null 2>&1; then
+        log "installing k9s"
+        tmp=$(mktemp -d)
+        curl -fsSL "https://github.com/derailed/k9s/releases/latest/download/k9s_Linux_${garch}.tar.gz" \
+            | tar -xz -C "$tmp" k9s && $SUDO install -m 0755 "$tmp/k9s" /usr/local/bin/k9s \
+            || warn "k9s install failed"
+        rm -rf "$tmp"
+    fi
+
+    if ! command -v stern >/dev/null 2>&1; then
+        tag=$(gh_latest_tag stern/stern)
+        if [ -n "$tag" ]; then
+            log "installing stern $tag"
+            tmp=$(mktemp -d)
+            curl -fsSL "https://github.com/stern/stern/releases/download/${tag}/stern_${tag#v}_linux_${garch}.tar.gz" \
+                | tar -xz -C "$tmp" stern && $SUDO install -m 0755 "$tmp/stern" /usr/local/bin/stern \
+                || warn "stern install failed"
+            rm -rf "$tmp"
+        else
+            warn "could not determine latest stern version"
+        fi
+    fi
+
+    if ! command -v dive >/dev/null 2>&1; then
+        tag=$(gh_latest_tag wagoodman/dive)
+        if [ -n "$tag" ]; then
+            log "installing dive $tag"
+            tmp=$(mktemp -d)
+            curl -fsSL "https://github.com/wagoodman/dive/releases/download/${tag}/dive_${tag#v}_linux_${garch}.tar.gz" \
+                | tar -xz -C "$tmp" dive && $SUDO install -m 0755 "$tmp/dive" /usr/local/bin/dive \
+                || warn "dive install failed"
+            rm -rf "$tmp"
+        else
+            warn "could not determine latest dive version"
+        fi
+    fi
+
+    if ! command -v sops >/dev/null 2>&1; then
+        tag=$(gh_latest_tag getsops/sops)
+        if [ -n "$tag" ]; then
+            log "installing sops $tag"
+            curl -fsSL "https://github.com/getsops/sops/releases/download/${tag}/sops-${tag}.linux.${garch}" -o /tmp/sops \
+                && $SUDO install -m 0755 /tmp/sops /usr/local/bin/sops || warn "sops install failed"
+            rm -f /tmp/sops
+        else
+            warn "could not determine latest sops version"
+        fi
+    fi
+
+    if ! command -v cloudflared >/dev/null 2>&1; then
+        log "installing cloudflared"
+        curl -fsSL "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${garch}" -o /tmp/cloudflared \
+            && $SUDO install -m 0755 /tmp/cloudflared /usr/local/bin/cloudflared || warn "cloudflared install failed"
+        rm -f /tmp/cloudflared
+    fi
+
+    # Azure kubelogin (AKS exec credential plugin) — brew: azure/kubelogin/kubelogin
+    if ! command -v kubelogin >/dev/null 2>&1; then
+        log "installing kubelogin (Azure)"
+        tmp=$(mktemp -d)
+        if curl -fsSL "https://github.com/Azure/kubelogin/releases/latest/download/kubelogin-linux-${garch}.zip" -o "$tmp/k.zip" \
+                && unzip -q "$tmp/k.zip" -d "$tmp"; then
+            $SUDO install -m 0755 "$tmp/bin/linux_${garch}/kubelogin" /usr/local/bin/kubelogin \
+                || warn "kubelogin install failed"
+        else
+            warn "kubelogin download failed"
+        fi
+        rm -rf "$tmp"
+    fi
+
+    # uv — Astral's installer drops uv/uvx into ~/.local/bin (on PATH via
+    # languages.zsh). INSTALLER_NO_MODIFY_PATH: PATH is the dotfiles' job.
+    if ! command -v uv >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/uv" ]; then
+        log "installing uv"
+        curl -LsSf https://astral.sh/uv/install.sh | env INSTALLER_NO_MODIFY_PATH=1 sh >/dev/null 2>&1 \
+            || warn "uv install failed"
+    fi
+
+    # Claude Code — native installer, also into ~/.local/bin.
+    if ! command -v claude >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/claude" ]; then
+        log "installing Claude Code"
+        curl -fsSL https://claude.ai/install.sh | bash >/dev/null 2>&1 || warn "claude code install failed"
     fi
 }
 
@@ -875,6 +1023,15 @@ stage_node() {
     local machine_key mf
     machine_key=$(detect_machine_key)
     mf="$DOTFILES_DIR/zsh/machines/${machine_key}.zsh"
+    # Match .zshrc's hash-suffix resolution: a machine file with a renamed human
+    # prefix (e.g. devdesktop-<hash>.zsh) is still this machine's file, so do not
+    # create a second, canonical-named one next to it.
+    if [ -n "$machine_key" ] && [ ! -f "$mf" ]; then
+        local hit
+        for hit in "$DOTFILES_DIR"/zsh/machines/*-"${machine_key##*-}".zsh; do
+            [ -f "$hit" ] && { mf="$hit"; break; }
+        done
+    fi
     if [ -n "$machine_key" ] && ! grep -q 'NVM_DIR' "$mf" 2>/dev/null; then
         {
             printf '\n# Node via nvm\n'
@@ -944,7 +1101,7 @@ stage_verify() {
     for b in git zsh vim tmux jq \
              node python3 java go \
              aws az gcloud \
-             kubectl kubectx helm terraform terragrunt; do
+             kubectl kubectx helm terraform terragrunt gh; do
         if tool_works "$b"; then
             printf '  %-10s %s\n' "$b" "$(command -v "$b")"
         elif command -v "$b" >/dev/null 2>&1; then
