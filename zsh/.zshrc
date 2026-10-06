@@ -144,3 +144,7 @@ test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell
 : "${DOTFILES_LOCAL_DIR:=$HOME/.dotfiles-local}"
 export DOTFILES_LOCAL_DIR
 source_if_exists "$DOTFILES_LOCAL_DIR/zsh/local.zsh"
+
+
+# Added by Antigravity CLI installer
+export PATH="/Users/biswajitpain/.local/bin:$PATH"

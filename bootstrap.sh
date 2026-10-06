@@ -371,7 +371,7 @@ install_linux_languages() {
             apt)
                 # Amazon's apt repo, keyring in the modern signed-by location.
                 if curl -fsSL https://apt.corretto.aws/corretto.key \
-                        | $SUDO gpg --dearmor -o /usr/share/keyrings/corretto.gpg 2>/dev/null; then
+                        | $SUDO gpg --batch --yes --dearmor -o /usr/share/keyrings/corretto.gpg 2>/dev/null; then
                     echo "deb [signed-by=/usr/share/keyrings/corretto.gpg] https://apt.corretto.aws stable main" \
                         | $SUDO tee /etc/apt/sources.list.d/corretto.list >/dev/null
                     $SUDO apt-get $APT_LOCK update -qq \
@@ -452,7 +452,7 @@ install_linux_cloud_tools() {
         case "$PKG" in
             apt)
                 if curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
-                        | $SUDO gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg 2>/dev/null; then
+                        | $SUDO gpg --batch --yes --dearmor -o /usr/share/keyrings/cloud.google.gpg 2>/dev/null; then
                     echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
                         | $SUDO tee /etc/apt/sources.list.d/google-cloud-sdk.list >/dev/null
                     $SUDO apt-get $APT_LOCK update -qq \
@@ -561,7 +561,7 @@ REPO
                     return 0
                 fi
                 if curl -fsSL https://apt.releases.hashicorp.com/gpg \
-                        | $SUDO gpg --dearmor -o /usr/share/keyrings/hashicorp.gpg 2>/dev/null; then
+                        | $SUDO gpg --batch --yes --dearmor -o /usr/share/keyrings/hashicorp.gpg 2>/dev/null; then
                     echo "deb [signed-by=/usr/share/keyrings/hashicorp.gpg] https://apt.releases.hashicorp.com $codename main" \
                         | $SUDO tee /etc/apt/sources.list.d/hashicorp.list >/dev/null
                     $SUDO apt-get $APT_LOCK update -qq && $SUDO apt-get $APT_LOCK install -y terraform \
