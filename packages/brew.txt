@@ -23,6 +23,7 @@ gawk
 go
 python@3.12
 pipx
+uv
 # java is Amazon Corretto 21 — see brew-cask-cli.txt
 
 # ── cloud CLIs ───────────────────────────────────────────────────────────────
@@ -42,6 +43,7 @@ helm
 kustomize
 stern
 k9s
+Azure/kubelogin/kubelogin   # AKS exec credential plugin (auto-taps)
 
 # ── data / text tools ────────────────────────────────────────────────────────
 jq
@@ -60,6 +62,8 @@ git-delta
 lazygit
 direnv
 zoxide
+git-filter-repo
+shellcheck
 
 # ── ops / debugging ──────────────────────────────────────────────────────────
 htop
@@ -67,6 +71,8 @@ watch
 httpie
 dive
 tldr
+cloudflared
+mysql-client
 
 # ── security ─────────────────────────────────────────────────────────────────
 gnupg
