@@ -122,7 +122,8 @@ step_local_dir() {
     esac
     if [ -d "$local_dir" ]; then
         local mode
-        mode=$(stat -f '%Lp' "$local_dir" 2>/dev/null || stat -c '%a' "$local_dir" 2>/dev/null)
+        # GNU stat first: on Linux `stat -f` means filesystem status and "succeeds".
+        mode=$(stat -c '%a' "$local_dir" 2>/dev/null || stat -f '%Lp' "$local_dir" 2>/dev/null)
         [ "$mode" = "700" ] || note "$local_dir mode is $mode; 700 recommended"
     fi
 }
