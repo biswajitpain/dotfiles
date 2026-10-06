@@ -164,6 +164,10 @@ detect_platform() {
     log "platform: $OS, package manager: ${PKG:-none detected}"
 }
 
+# A fresh cloud VM runs unattended-upgrades on first boot and holds the dpkg
+# lock for minutes; without a timeout every apt call fails instantly.
+APT_LOCK="-o DPkg::Lock::Timeout=900"
+
 # sudo that explains itself before prompting, and fails clearly if unavailable.
 SUDO=""
 need_sudo() {
@@ -202,7 +206,7 @@ stage_repo() {
 bootstrap_git() {
     case "$PKG" in
         brew)   install_homebrew && brew install git ;;
-        apt)    need_sudo; $SUDO apt-get update -qq && $SUDO apt-get install -y git ;;
+        apt)    need_sudo; $SUDO apt-get $APT_LOCK update -qq && $SUDO apt-get $APT_LOCK install -y git ;;
         dnf)    need_sudo; $SUDO dnf install -y git ;;
         pacman) need_sudo; $SUDO pacman -S --needed --noconfirm git ;;
         zypper) need_sudo; $SUDO zypper install -y git ;;
@@ -283,7 +287,7 @@ stage_packages() {
         apt)
             need_sudo
             local pkgs; pkgs=$(read_manifest "$DOTFILES_DIR/packages/apt.txt")
-            $SUDO apt-get update -qq || warn "apt update failed"
+            $SUDO apt-get $APT_LOCK update -qq || warn "apt update failed"
             # shellcheck disable=SC2086
             if [ -n "$pkgs" ]; then
                 # shellcheck disable=SC2086
@@ -291,11 +295,11 @@ stage_packages() {
                 # single name is unknown (newer tools such as eza or lazygit are
                 # missing on older Debian/Ubuntu). On failure, retry one by one
                 # so one absent package cannot cost every other.
-                if ! $SUDO apt-get install -y $pkgs; then
+                if ! $SUDO apt-get $APT_LOCK install -y $pkgs; then
                     warn "bulk apt install failed; retrying packages individually"
                     local p
                     for p in $pkgs; do
-                        $SUDO apt-get install -y "$p" >/dev/null 2>&1 || warn "apt: $p unavailable"
+                        $SUDO apt-get $APT_LOCK install -y "$p" >/dev/null 2>&1 || warn "apt: $p failed"
                     done
                 fi
             fi
@@ -370,8 +374,8 @@ install_linux_languages() {
                         | $SUDO gpg --dearmor -o /usr/share/keyrings/corretto.gpg 2>/dev/null; then
                     echo "deb [signed-by=/usr/share/keyrings/corretto.gpg] https://apt.corretto.aws stable main" \
                         | $SUDO tee /etc/apt/sources.list.d/corretto.list >/dev/null
-                    $SUDO apt-get update -qq \
-                        && $SUDO apt-get install -y java-21-amazon-corretto-jdk \
+                    $SUDO apt-get $APT_LOCK update -qq \
+                        && $SUDO apt-get $APT_LOCK install -y java-21-amazon-corretto-jdk \
                         || warn "corretto install failed"
                 else
                     warn "could not add corretto apt key"
@@ -451,8 +455,8 @@ install_linux_cloud_tools() {
                         | $SUDO gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg 2>/dev/null; then
                     echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
                         | $SUDO tee /etc/apt/sources.list.d/google-cloud-sdk.list >/dev/null
-                    $SUDO apt-get update -qq \
-                        && $SUDO apt-get install -y google-cloud-cli \
+                    $SUDO apt-get $APT_LOCK update -qq \
+                        && $SUDO apt-get $APT_LOCK install -y google-cloud-cli \
                         || warn "gcloud install failed"
                 else
                     warn "could not add google cloud apt key"
@@ -499,7 +503,7 @@ REPO
                     $SUDO chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
                     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
                         | $SUDO tee /etc/apt/sources.list.d/github-cli.list >/dev/null
-                    $SUDO apt-get update -qq && $SUDO apt-get install -y gh \
+                    $SUDO apt-get $APT_LOCK update -qq && $SUDO apt-get $APT_LOCK install -y gh \
                         || warn "gh install failed"
                 else
                     warn "could not add the GitHub CLI apt key"
@@ -560,7 +564,7 @@ REPO
                         | $SUDO gpg --dearmor -o /usr/share/keyrings/hashicorp.gpg 2>/dev/null; then
                     echo "deb [signed-by=/usr/share/keyrings/hashicorp.gpg] https://apt.releases.hashicorp.com $codename main" \
                         | $SUDO tee /etc/apt/sources.list.d/hashicorp.list >/dev/null
-                    $SUDO apt-get update -qq && $SUDO apt-get install -y terraform \
+                    $SUDO apt-get $APT_LOCK update -qq && $SUDO apt-get $APT_LOCK install -y terraform \
                         || warn "terraform install failed"
                 fi
                 ;;
