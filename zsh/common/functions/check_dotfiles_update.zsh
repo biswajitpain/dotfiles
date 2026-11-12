@@ -20,6 +20,11 @@
 # avoids output landing after the prompt has been drawn, which is what makes
 # backgrounded messages garble a terminal.
 
+# `command rm` throughout, never bare `rm`. general.zsh aliases rm to `rm -iv`
+# and is sourced BEFORE this file, so zsh bakes that alias into these function
+# bodies at definition time. The -v would then print "removed ..." from the
+# BACKGROUND job — the exact after-the-prompt garbling this two-half split
+# exists to prevent.
 _dotfiles_dir()    { print -r -- "${DOTFILES_DIR:-$HOME/.dotfiles}"; }
 _dotfiles_notice() { print -r -- "$(_dotfiles_dir)/.update_notice"; }
 
@@ -69,7 +74,7 @@ function check_dotfiles_update() {
     if [[ "$behind" == <-> ]] && (( behind > 0 )); then
         print -r -- "dotfiles: $behind commit(s) behind origin/main. Run: dotfiles-update" >|"$notice"
     else
-        rm -f -- "$notice" 2>/dev/null
+        command rm -f -- "$notice" 2>/dev/null
     fi
     return 0
 }
@@ -88,7 +93,7 @@ dotfiles-update() {
     behind=$(git -C "$dotfiles_dir" rev-list --count HEAD..origin/main 2>/dev/null)
     if [[ "$behind" != <-> ]] || (( behind == 0 )); then
         print -r -- "dotfiles: already up to date."
-        rm -f -- "$(_dotfiles_notice)" 2>/dev/null
+        command rm -f -- "$(_dotfiles_notice)" 2>/dev/null
         return 0
     fi
 
@@ -107,7 +112,7 @@ dotfiles-update() {
             git -C "$dotfiles_dir" pull --ff-only origin main \
                 || { print -u2 -- "pull failed (diverged or rewritten history) — resolve manually"; return 1; }
             "$dotfiles_dir/install.sh" local
-            rm -f -- "$(_dotfiles_notice)" 2>/dev/null
+            command rm -f -- "$(_dotfiles_notice)" 2>/dev/null
             print -r -- "Done. Open a new shell."
             ;;
         *) print -r -- "Skipped." ;;

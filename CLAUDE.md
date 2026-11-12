@@ -30,9 +30,49 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/biswajitpain/dotfiles/ma
 ./scripts/audit-repo.sh
 ./scripts/audit-repo.sh --history
 
+# Run the test suite (no dependencies; never touches the real $HOME)
+./tests/run-tests.sh
+./tests/run-tests.sh install hook   # only files matching these substrings
+
 # Reload zsh config in current shell
 source ~/.zshrc
 ```
+
+## Tests
+
+`tests/` holds a dependency-free suite — no bats, no shunit2 — because it has to
+run on a freshly imaged machine, before `bootstrap.sh` has installed anything.
+Its job includes verifying the installer, so it cannot depend on the installer.
+CI runs it on macOS and Linux (`.github/workflows/test.yml`). See `tests/README.md`.
+
+**The safety rule: no test ever touches the real `$HOME`.** Anything that writes
+runs in a sandbox from `sandbox_new`, which repoints `HOME`, `DOTFILES_DIR` and
+`DOTFILES_LOCAL_DIR` into a temp dir. Every write helper calls `assert_sandboxed`,
+which aborts the run if `HOME` escapes. Tests use `zsh -c`, not `zsh -i`, so the
+background update check never fires and nothing hits the network.
+
+Changing behaviour means changing a test. In particular:
+
+- **Adding an alias or function**: add it to `tests/contract/core-features.txt`.
+  That file is the deliberate half of the contract — `test_040` separately proves
+  that everything the repo *declares* survives a shell load, but only the contract
+  file makes a *deletion* fail the build.
+- **Changing `SALT` or `KEY_LEN`** in `detect-machine.sh`: `test_020` fails on
+  purpose. Both define every filename in `zsh/machines/`, so changing either
+  orphans every machine's config on every machine. The failing test is the moment
+  to notice, not afterwards.
+- **Adding a credential-bearing config**: add the real path to the hook's
+  `FORBIDDEN_PATHS`, to the audit's forbidden list, *and* to `test_060`/`test_070`.
+  A scanner rule with no test is a rule that can silently stop matching — that is
+  exactly how rule 3 of the hook came to match nothing but `AZ_SUB_*`.
+- **Touching `install.sh` link/backup logic**: `test_050` covers the two ways it
+  has gone wrong — a dangling symlink aborting the whole run under `set -e`, and
+  two runs inside the same second sharing a timestamped backup directory and
+  destroying the user's original file.
+
+A green suite proves nothing unless it goes red when the code breaks. Check that
+by mutation: copy the repo to a scratch dir, break one thing, confirm the right
+file fails.
 
 ## Secrets Architecture — The Rule
 
@@ -51,13 +91,24 @@ the whole point: a `.gitignore` mistake or a `git add -f` cannot leak it.
 `$HOME` symlinks point at the rendered files (`~/.aws/config`, `~/.kube/config`,
 `~/.gitconfig`), so tools see them normally.
 
-Three layers enforce this:
+Four layers enforce this:
 
 1. **`.gitignore`** denies `aws/*`, `kube/*`, `config/*`, `git/.gitconfig.*` and
    re-includes only `*.template`. Never add a `!aws/config`-style exception.
 2. **`git/hooks/pre-commit`** blocks forbidden paths and cloud identifiers
    (AKIA keys, role ARNs, `external_id`, kube CA data, cluster endpoints).
 3. **`scripts/audit-repo.sh`** is the backstop; `--history` scans every blob.
+4. **`tests/`** proves layers 1–3 still work, from both sides: the bad thing is
+   blocked *and* the legitimate lookalike still goes through. A scanner that
+   cries wolf gets bypassed with `--no-verify`, which is the same as not having
+   one.
+
+A corollary that is easy to lose: nothing credential-bearing may be *sited*
+inside the repo, even untracked. `scripts/az-aliases.sh` once defaulted
+`AZURE_CONFIG_DIR` to `config/azure` in the repo, which put `msal_token_cache.json`
+— live OAuth tokens — in a public checkout behind nothing but a `.gitignore`
+line. It now defaults into `$DOTFILES_LOCAL_DIR/azure`, and `test_080` enforces
+that.
 
 Adding a new credential-bearing config: commit a `*.template` with `{{PLACEHOLDER}}`
 markers, render it in `bootstrap.sh`'s `stage_cloud`/`stage_identity`, and add the
@@ -122,11 +173,28 @@ Not yet migrated (they still carry pre-hash names): `mac-pro`, `office-mac1`, `o
 
 ## Auto-Update Mechanism
 
-`check_dotfiles_update` runs in the background on every interactive shell. It checks `~/.dotfiles/.last_update` (ignored by git) and fetches from `origin/main` weekly. If behind, it pulls and re-runs `install.sh`.
+Split in two halves, and **nothing is automatic**.
+
+`dotfiles_update_notice` runs synchronously at shell start: it just prints
+whatever `.update_notice` holds. One file read, no network, so it cannot arrive
+after the prompt has been drawn and garble the terminal.
+
+`check_dotfiles_update` is backgrounded (`&!` — background *and* disown, so zsh
+prints neither the start nor the completion notice). At most once a week, gated
+by `.last_update`, it does a read-only `git fetch` and records whether the
+checkout is behind. It prints nothing, **never pulls, and never runs
+`install.sh`** — an earlier version did both unattended on every interactive
+shell, which is remote code execution on a schedule.
+
+Applying an update is an explicit human action: `dotfiles-update` shows what is
+incoming, asks, then pulls with `--ff-only` and re-links. `--ff-only` is load-
+bearing: when upstream history has been rewritten it fails loudly instead of
+merging two unrelated histories. `test_090` covers all of this.
 
 ## Gitignored Files
 
 `.last_update` — timestamp for weekly update check  
+`.update_notice` — pending-update message shown at next shell start  
 `.machine_type` — legacy file, no longer used  
 `.claude/` — local Claude Code settings  
 `aws/*`, `kube/*`, `config/*`, `git/.gitconfig.*` — denied by default; only

@@ -13,7 +13,9 @@ error() { echo -e "\033[0;31m[ERROR]\033[0m $1"; }
 
 
 mkd() {
-    mkdir -p "$@" && cd "$_"
+    # `command mkdir`: general.zsh aliases mkdir to `mkdir -pv`, and that alias is
+    # baked in here at definition time, so a bare call would depend on load order.
+    command mkdir -p "$@" && cd "$_"
 }
 
 # gmsg: Short git messages

@@ -42,6 +42,11 @@ source_if_exists() {
     for file in "$@"; do
         [ -f "$file" ] && source "$file"
     done
+    # Always succeed. Without this the function returns the status of the last
+    # iteration, so a missing optional file (the common case for the local
+    # override at the end of this file) makes `source ~/.zshrc` exit 1 — which
+    # breaks the `reload` alias and any script that does `source ~/.zshrc || ...`.
+    return 0
 }
 
 # Load common aliases and functions

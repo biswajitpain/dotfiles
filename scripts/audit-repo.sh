@@ -29,31 +29,36 @@ ok()   { printf "${GREEN}[ok]${NC} %s\n" "$1"; }
 note() { printf "${YELLOW}[note]${NC} %s\n" "$1"; }
 
 # Files that are allowed to contain example-looking values.
+# Kept in step with CONTENT_EXEMPT in git/hooks/pre-commit. tests/ is here for
+# the same reason as this script: it is a list of secret patterns by
+# construction, so scanning it would make the scanner report itself.
 is_exempt() {
     case "$1" in
         *.template|*/hooks/*|scripts/audit-repo.sh|DOCS.md|CLAUDE.md|README.md) return 0 ;;
+        tests/*) return 0 ;;
         *) return 1 ;;
     esac
 }
 
 # ── 1. Credential-bearing files that must never be tracked ───────────────────
+# Matched at any path component rather than against a fixed list of repo-root
+# paths. An exact-path check says nothing about tests/fixtures/aws/config or
+# vendor/kube/config, and a real credential file is one wherever it is parked.
+# Deliberately the same shape as FORBIDDEN_PATHS in git/hooks/pre-commit.
+FORBIDDEN_FILE_RE='(^|/)(aws/(config|credentials)|kube/config|azure-subscriptions\.env|\.env)$|(^|/)\.gitconfig\.[^./]*$|(^|/)id_(rsa|dsa|ecdsa|ed25519)$|(^|/)(credentials|secrets\.json|allowed_signers)$'
+
 step_tracked_files() {
-    local forbidden f found=0
-    # Real configs belong in $DOTFILES_LOCAL_DIR, not here.
-    for forbidden in "aws/config" "aws/credentials" "kube/config" \
-                     "config/azure-subscriptions.env" ".env"; do
-        if git ls-files --error-unmatch "$forbidden" >/dev/null 2>&1; then
-            finding "tracked file must not be in the repo: $forbidden (move to \$DOTFILES_LOCAL_DIR)"
+    local f found=0
+    while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        case "$f" in *.template) continue ;; esac
+        if printf '%s' "$f" | grep -qE "$FORBIDDEN_FILE_RE"; then
+            finding "tracked file must not be in the repo: $f (move to \$DOTFILES_LOCAL_DIR)"
             found=1
         fi
-    done
-    # Any per-machine gitconfig carries an identity.
-    for f in $(git ls-files 'git/.gitconfig.*' 2>/dev/null); do
-        case "$f" in
-            *.template) ;;
-            *) finding "tracked identity file: $f (render from templates/git/gitconfig.template instead)"; found=1 ;;
-        esac
-    done
+    done <<EOF
+$(git ls-files)
+EOF
     [ "$found" -eq 0 ] && ok "no credential-bearing files tracked"
 }
 
@@ -83,7 +88,10 @@ step_content() {
             [ -n "$file" ] || continue
             is_exempt "$file" && continue
             # Count matches without printing the secret value itself.
-            hits=$(grep -cE "$regex" "$file" 2>/dev/null || true)
+            # `--` is required: the private-key pattern begins with "-----", and
+            # without it grep parses the pattern as options, errors out, and the
+            # `|| true` below swallows that — the rule silently never fires.
+            hits=$(grep -cE -- "$regex" "$file" 2>/dev/null || true)
             if [ -n "$hits" ] && [ "$hits" -gt 0 ] 2>/dev/null; then
                 finding "$label in $file ($hits match(es)) — value not printed"
                 clean=0

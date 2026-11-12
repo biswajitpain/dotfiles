@@ -1,0 +1,71 @@
+name: tests
+
+# The suite installs nothing and never touches a real $HOME, so it is safe to
+# run on every push. The point of running it on BOTH platforms is that this repo
+# is shared between macOS laptops and Linux VMs: machine detection, the package
+# manifests and the OS-specific zsh files all branch on `uname`, and a change
+# that works on one can silently break the other.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Weekly, so the history scan below keeps running even in a quiet week.
+    - cron: '17 6 * * 1'
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The audit's --history pass needs every commit, not a shallow clone.
+          fetch-depth: 0
+
+      - name: Install zsh (Linux runners do not ship it)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y zsh
+
+      - name: Show versions
+        run: |
+          echo "os:   $(uname -a)"
+          echo "bash: $(bash --version | head -1)"
+          echo "zsh:  $(zsh --version)"
+          echo "git:  $(git --version)"
+
+      - name: Run the test suite
+        env:
+          NO_COLOR: "1"
+        run: ./tests/run-tests.sh
+
+  audit-history:
+    # Separate job: scanning every blob is slow, and a finding here means
+    # something leaked in the past, which is a different alarm from a failing test.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan all of history for credentials
+        env:
+          NO_COLOR: "1"
+        run: ./scripts/audit-repo.sh --history
+
+  shellcheck:
+    # Advisory. Style findings must not block a dotfiles change, but they are
+    # worth seeing in the log.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck the bash scripts
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y shellcheck
+          shellcheck --severity=error \
+            bootstrap.sh install.sh scripts/*.sh git/hooks/pre-commit \
+            tests/run-tests.sh tests/lib/harness.sh tests/test_*.sh

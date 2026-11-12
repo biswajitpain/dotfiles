@@ -71,6 +71,8 @@ alias k='kubectl'
 alias kgp='kubectl get pods'
 alias kgs='kubectl get services'
 alias kgd='kubectl get deployments'
+alias ctx='kubectx'   # switch/list kube contexts
+alias ns='kubens'     # switch/list namespace in current context
 
 # Misc
 alias h='history'

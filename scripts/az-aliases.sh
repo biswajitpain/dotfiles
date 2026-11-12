@@ -27,13 +27,31 @@ fi
 _az_aliases__script_dir="$(CDPATH= cd -- "$(dirname -- "$_az_aliases__source_file")" 2>/dev/null && pwd)"
 _az_aliases__dotfiles_root="$(CDPATH= cd -- "${_az_aliases__script_dir}/.." 2>/dev/null && pwd)"
 
-# Keep Azure CLI state under dotfiles config by default.
-: "${BIGLY_AZ_CONFIG_DIR:=${_az_aliases__dotfiles_root}/config/azure}"
-: "${BIGLY_AZ_SUBSCRIPTIONS_FILE:=${_az_aliases__dotfiles_root}/config/azure-subscriptions.env}"
+# Azure CLI state goes OUTSIDE the repo.
+#
+# AZURE_CONFIG_DIR holds msal_token_cache.json — live OAuth tokens — plus
+# azureProfile.json, which lists every subscription and tenant id. Defaulting it
+# into the repo put all of that inside a public checkout, protected by nothing
+# but a .gitignore line. That is precisely the arrangement $DOTFILES_LOCAL_DIR
+# exists to replace: see "Secrets Architecture" in CLAUDE.md.
+: "${DOTFILES_LOCAL_DIR:=$HOME/.dotfiles-local}"
+: "${BIGLY_AZ_CONFIG_DIR:=${DOTFILES_LOCAL_DIR}/azure}"
+
+# Subscription mapping: prefer the rendered copy bootstrap.sh writes. Fall back
+# to the old in-repo path so a machine that has not been migrated keeps working.
+if [ -z "${BIGLY_AZ_SUBSCRIPTIONS_FILE:-}" ]; then
+  if [ -f "${DOTFILES_LOCAL_DIR}/config/azure-subscriptions.env" ]; then
+    BIGLY_AZ_SUBSCRIPTIONS_FILE="${DOTFILES_LOCAL_DIR}/config/azure-subscriptions.env"
+  else
+    BIGLY_AZ_SUBSCRIPTIONS_FILE="${_az_aliases__dotfiles_root}/config/azure-subscriptions.env"
+  fi
+fi
 
 export AZURE_CONFIG_DIR="$BIGLY_AZ_CONFIG_DIR"
 
-mkdir -p "$AZURE_CONFIG_DIR" 2>/dev/null || true
+# `command mkdir`: this file is sourced after general.zsh, whose `mkdir -pv`
+# alias would otherwise print the directory on every shell that creates it.
+command mkdir -p "$AZURE_CONFIG_DIR" 2>/dev/null || true
 
 # Load subscription mapping if present.
 if [ -f "$BIGLY_AZ_SUBSCRIPTIONS_FILE" ]; then

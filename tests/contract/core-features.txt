@@ -1,0 +1,136 @@
+# tests/contract/core-features.txt
+#
+# The commands you actually type. Every entry here must exist after a login
+# shell loads, on every machine, forever. This is the deliberate half of the
+# suite: the dynamic check in test_040 proves that whatever the repo declares
+# survives loading, but it would happily wave through someone DELETING a
+# declaration. This file is what makes a deletion fail the build.
+#
+# Format: <alias|func>:<name>   # optional note
+# Adding a feature? Add it here. Removing one on purpose? Remove it here, in the
+# same commit, so the removal is visible in review.
+
+# ── Navigation ───────────────────────────────────────────────────────────────
+alias:..
+alias:...
+alias:....
+
+# ── Listing and files ────────────────────────────────────────────────────────
+alias:ls
+alias:ll
+alias:la
+alias:l
+alias:lsd
+alias:cp
+alias:mv
+alias:rm
+alias:mkdir
+
+# ── Git ──────────────────────────────────────────────────────────────────────
+alias:g
+alias:gs
+alias:gd
+alias:gc
+alias:gca
+alias:gco
+alias:gb
+alias:gl
+alias:grh
+alias:grhh
+
+# ── Docker ───────────────────────────────────────────────────────────────────
+alias:d
+alias:dc
+alias:dps
+alias:dpsa
+
+# ── Kubernetes ───────────────────────────────────────────────────────────────
+alias:k
+alias:kgp
+alias:kgs
+alias:kgd
+alias:ctx                # kubectx — switch context
+alias:ns                 # kubens  — switch namespace
+
+# ── Shell conveniences ───────────────────────────────────────────────────────
+alias:h
+alias:j
+alias:path
+alias:reload
+alias:zshrc
+alias:vimrc
+alias:tmuxconf
+alias:now
+alias:nowdate
+alias:psa
+alias:psg
+alias:ping
+alias:ipinfo
+alias:df
+alias:du
+
+# ── Utility functions ────────────────────────────────────────────────────────
+func:source_if_exists
+func:machine-info        # which machine key resolved, and from which file
+func:mkd
+func:extract
+func:targz
+func:tmpd
+func:fs
+func:ff
+func:fh
+func:server
+func:dataurl
+func:weather
+func:gmsg
+func:getcertnames
+func:langs               # which toolchains this machine actually has
+
+# ── DNS helpers ──────────────────────────────────────────────────────────────
+func:digs
+func:digx
+func:digmx
+func:digns
+func:diga
+func:digaaaa
+func:digtxt
+func:digtrace
+func:digprop
+func:digga
+
+# ── Dotfiles self-update ─────────────────────────────────────────────────────
+func:dotfiles-update
+func:dotfiles_update_notice
+func:check_dotfiles_update
+
+# ── Commit signing ───────────────────────────────────────────────────────────
+func:ssh_sign_setup
+func:ssh_sign_disable
+func:ssh_sign_status
+func:ssh_sign_export
+func:ssh_sign_verify
+func:ssh_allowed_signers_add
+func:gpg_setup
+func:gpg_disable
+func:gpg_list
+func:gpg_new
+func:gpg_export
+func:gpg_import
+func:gpg_sign
+func:gpg_verify
+
+# ── Azure subscription switching ─────────────────────────────────────────────
+func:az-config
+func:az-sub
+func:az-login
+func:az-whoami
+func:az-prod
+func:az-shared
+func:az-stage
+func:az-dev
+func:az-bootstrap
+func:az-connectivity
+func:az-identity
+func:az-management
+func:az-data-prod
+func:az-data-staging

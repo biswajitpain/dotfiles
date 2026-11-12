@@ -74,23 +74,59 @@ install_oh_my_zsh() {
     fi
 }
 
-# Backup existing dotfiles
+# Backup existing dotfiles.
+#
+# A symlink that already points into our own trees holds nothing worth keeping,
+# so leave it where it is. That matters twice over:
+#   - every re-run would otherwise churn a fresh backup of a link;
+#   - $BACKUP_DIR is timestamped to the SECOND, so two runs inside the same
+#     second share a directory and the second `mv` would drop that worthless
+#     link on top of the real file the first run had just rescued. That is
+#     silent, permanent data loss, and `dotfiles-update` re-runs this script.
 backup_file() {
-    if [ -e "$1" ]; then
+    if [ -L "$1" ]; then
+        local current
+        current=$(readlink "$1")
+        case "$current" in
+            "$DOTFILES_DIR"/*|"$DOTFILES_LOCAL_DIR"/*) return 0 ;;
+        esac
+    fi
+    # -e is FALSE for a dangling symlink, so test -L as well. Without it a
+    # dangling ~/.zshrc (dotfiles dir moved or deleted) survives to link_file,
+    # whose `ln -s` then fails with "File exists" and, under `set -e`, aborts
+    # the whole install — leaving the machine unable to repair itself.
+    if [ -e "$1" ] || [ -L "$1" ]; then
         mkdir -p "$BACKUP_DIR"
         mv "$1" "$BACKUP_DIR/"
         log "Backed up $1 to $BACKUP_DIR/"
     fi
 }
 
-# Create symlink
+# Create symlink. Idempotent: a correct link is left alone, and a stale link
+# into our own trees is repointed rather than reported as a conflict.
 link_file() {
-    if [ -e "$2" ]; then
-        warn "$2 already exists, skipping..."
-    else
-        ln -s "$1" "$2"
-        log "Linked $1 to $2"
+    local src="$1" dst="$2"
+    if [ -L "$dst" ]; then
+        local current
+        current=$(readlink "$dst")
+        if [ "$current" = "$src" ]; then
+            log "$dst already links to $src"
+            return 0
+        fi
+        case "$current" in
+            "$DOTFILES_DIR"/*|"$DOTFILES_LOCAL_DIR"/*)
+                ln -sfn "$src" "$dst"
+                log "Repointed $dst to $src (was $current)"
+                return 0
+                ;;
+        esac
     fi
+    if [ -e "$dst" ] || [ -L "$dst" ]; then
+        warn "$dst already exists, skipping..."
+        return 0
+    fi
+    ln -s "$src" "$dst"
+    log "Linked $src to $dst"
 }
 
 # Set up Git configuration.
@@ -326,11 +362,18 @@ main() {
         log "Pre-commit secret scanner installed for dotfiles repo"
     fi
 
-    # Set up Azure subscription mapping if not already present
-    local az_subs_file="$DOTFILES_DIR/config/azure-subscriptions.env"
+    # Set up Azure subscription mapping if not already present.
+    # It lands in $DOTFILES_LOCAL_DIR, outside the repo, because once filled in
+    # it holds subscription and tenant GUIDs. scripts/az-aliases.sh reads from
+    # there first; writing it into the repo meant bootstrap.sh rendered one copy
+    # while the shell read a different one.
+    local az_subs_file="$DOTFILES_LOCAL_DIR/config/azure-subscriptions.env"
     local az_subs_template="$DOTFILES_DIR/config/azure-subscriptions.env.template"
     if [ ! -f "$az_subs_file" ] && [ -f "$az_subs_template" ]; then
+        mkdir -p "$DOTFILES_LOCAL_DIR/config"
+        chmod 700 "$DOTFILES_LOCAL_DIR"
         \cp "$az_subs_template" "$az_subs_file"
+        chmod 600 "$az_subs_file"
         warn "Azure subscriptions file created from template: $az_subs_file"
         warn "Edit it to add your real subscription IDs."
     fi

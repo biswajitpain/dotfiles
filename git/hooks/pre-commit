@@ -57,15 +57,34 @@ for file in $(staged_files); do
     fi
 done
 
+# Files that legitimately contain the SHAPE of a secret: templates, the docs
+# that explain the scheme, the audit scanner, and the test suite that proves the
+# scanners work. Defined once so rules 3 and 4c cannot drift apart. This exempts
+# CONTENT only — rules 1, 4 and 4b still apply to every path.
+CONTENT_EXEMPT='\.template$|^DOCS\.md$|^CLAUDE\.md$|^README\.md$|^scripts/audit-repo\.sh$|^tests/'
+
 # ── 3. Block high-entropy secret patterns ────────────────────────────────────
-# Matches common token/key assignment patterns:
-#   API_KEY="abc123..."   TOKEN=xxx   SECRET=xxx   PASSWORD=xxx
-SECRET_CONTENT_PATTERN='(API_KEY|API_SECRET|ACCESS_TOKEN|SECRET_KEY|AUTH_TOKEN|PRIVATE_KEY|PASSWORD|PASSWD|AZ_SUB_[A-Z_]+=")[^"]{8,}"'
+# Matches common token/key assignments, quoted or bare:
+#   API_KEY="abc123..."   ACCESS_TOKEN=ghp_xxx   PASSWORD='hunter2'
+#
+# The alternation must be grouped SEPARATELY from the '=' or the '=' binds only
+# to the last branch. An earlier version read (API_KEY|...|AZ_SUB_[A-Z_]+=")...
+# which silently matched nothing but AZ_SUB_*: API_KEY=, PASSWORD= and a bare
+# ACCESS_TOKEN=ghp_... all sailed through. Deliberately the same shape as
+# "generic secret assignment" in scripts/audit-repo.sh — the two layers are
+# meant to agree, and a hole in one is a hole in both.
+SECRET_CONTENT_PATTERN='(SECRET|PASSWORD|PASSWD|API_KEY|API_SECRET|SECRET_KEY|ACCESS_TOKEN|AUTH_TOKEN|PRIVATE_KEY|AZ_SUB_[A-Z_]+)[A-Z_]*[[:space:]]*=[[:space:]]*['\''"]?[^[:space:]'\''"]{8,}'
 
 for file in $(staged_files); do
-    # scripts/audit-repo.sh is a list of secret patterns by construction; rule 4c
-    # already exempts it and this rule must agree, or the scanner blocks itself.
-    if echo "$file" | grep -qE '^scripts/audit-repo\.sh$'; then
+    # Templates show the SHAPE of a secret by construction, docs describe it, and
+    # scripts/audit-repo.sh and tests/ are lists of these patterns. Same exemption
+    # list as rule 4c and as is_exempt() in audit-repo.sh, so the layers cannot
+    # disagree. A template holding a REAL value is still caught by rule 5 below.
+    #
+    # tests/ is exempt from CONTENT rules only, never from the forbidden-path and
+    # secret-filename rules above: a test may describe a secret, but no real
+    # aws/config or id_ed25519 may hide under tests/ either.
+    if echo "$file" | grep -qE "$CONTENT_EXEMPT"; then
         continue
     fi
     if git diff --cached -- "$file" | grep -qE "$SECRET_CONTENT_PATTERN"; then
@@ -77,8 +96,10 @@ done
 
 # ── 4. Block SSH private key files (files without .pub extension) ─────────────
 for file in $(staged_files); do
-    if echo "$file" | grep -qE '^(ssh/|\.ssh/|id_rsa|id_ed25519|id_ecdsa)' && \
-       ! echo "$file" | grep -qE '\.pub$|config$|known_hosts$|authorized_keys$'; then
+    # Anchored at any path component, not just the repo root: a key is no less a
+    # key for sitting in tests/fixtures/ or vendor/.
+    if echo "$file" | grep -qE '(^|/)(ssh|\.ssh)/|(^|/)id_(rsa|dsa|ecdsa|ed25519)' && \
+       ! echo "$file" | grep -qE '\.pub$|(^|/)config$|known_hosts$|authorized_keys$'; then
         echo -e "${RED}[SECRET BLOCK]${NC} Possible SSH private key file: $file"
         FAILED=1
     fi
@@ -87,12 +108,15 @@ done
 # ── 4b. Block credential-bearing config paths outright ───────────────────────
 # These belong in $DOTFILES_LOCAL_DIR (outside the repo), never here. The
 # absence of this rule is what let aws/config and kube/config get committed.
+# Matched at any path component, not just the repo root. An anchored '^aws/config$'
+# says nothing about tests/fixtures/aws/config or vendor/aws/config, and a real
+# credential file is a real credential file wherever it is parked.
 FORBIDDEN_PATHS=(
-    '^aws/config$'
-    '^aws/credentials$'
-    '^kube/config$'
-    '^config/azure-subscriptions\.env$'
-    '^git/\.gitconfig\.[^.]*$'   # per-machine identities; *.template is fine
+    '(^|/)aws/config$'
+    '(^|/)aws/credentials$'
+    '(^|/)kube/config$'
+    '(^|/)azure-subscriptions\.env$'
+    '(^|/)\.gitconfig\.[^./]*$'   # per-machine identities; *.template is fine
 )
 
 for file in $(staged_files); do
@@ -119,8 +143,9 @@ INFRA_PATTERNS=(
 )
 
 for file in $(staged_files); do
-    # Templates, docs and the audit script legitimately show pattern shapes.
-    if echo "$file" | grep -qE '\.template$|^DOCS\.md$|^CLAUDE\.md$|^README\.md$|^scripts/audit-repo\.sh$'; then
+    # Templates, docs, the audit script and the test suite legitimately show
+    # pattern shapes. See CONTENT_EXEMPT above.
+    if echo "$file" | grep -qE "$CONTENT_EXEMPT"; then
         continue
     fi
     for pattern in "${INFRA_PATTERNS[@]}"; do
@@ -135,9 +160,13 @@ done
 # ── 5. Warn on .env.template files that contain real-looking values ───────────
 UUID_PATTERN='[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 
+# Obvious placeholders are the whole point of a template, so they are not a
+# finding: the all-zero GUID, all-f, and xxxx forms.
+UUID_PLACEHOLDER='00000000-0000|ffffffff-ffff|[xX]{8}-[xX]{4}'
+
 for file in $(staged_files); do
     if echo "$file" | grep -qE '\.template$'; then
-        if git diff --cached -- "$file" | grep -qE "$UUID_PATTERN"; then
+        if git diff --cached -- "$file" | grep -vE "$UUID_PLACEHOLDER" | grep -qE "$UUID_PATTERN"; then
             echo -e "${YELLOW}[SECRET WARN]${NC} Real-looking UUID found in template: $file"
             echo -e "${YELLOW}  Templates should use placeholder values, not real IDs.${NC}"
             FAILED=1
