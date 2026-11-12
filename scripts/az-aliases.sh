@@ -1,3 +1,7 @@
+# shellcheck shell=bash
+# Sourced, never executed, and sourced from BOTH bash and zsh — hence no
+# shebang (SC2148). The shell directive above is for shellcheck's benefit only.
+#
 # Azure CLI subscription switch helpers (dotfiles)
 #
 # Usage:
@@ -19,6 +23,9 @@ _az_aliases__source_file=""
 if [ -n "${BASH_SOURCE[0]:-}" ]; then
   _az_aliases__source_file="${BASH_SOURCE[0]}"
 elif [ -n "${ZSH_VERSION:-}" ]; then
+  # ${(%):-%N} is zsh's "path of the file being sourced". It is only ever
+  # reached under zsh; shellcheck parses this file as bash and cannot know that.
+  # shellcheck disable=SC2296
   _az_aliases__source_file="${(%):-%N}"
 else
   _az_aliases__source_file="$0"
