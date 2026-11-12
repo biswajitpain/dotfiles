@@ -110,6 +110,15 @@ blocked "an ssh private key under tests/" "tests/fixtures/id_ed25519" "key"
 
 # The two scanners must agree on what is exempt, or one silently stops covering
 # what the other skips.
+# The history scan has its own copy of the exemption list as git pathspecs.
+# It once did not, and reported this repo's own test suite as a historical leak.
+hist=$(awk '/^EXEMPT_PATHSPEC=\(/,/^\)/' "$REPO_ROOT/scripts/audit-repo.sh")
+for token in 'template' 'hooks' 'audit-repo' 'DOCS' 'CLAUDE' 'README' 'tests'; do
+    assert_match "$hist" "$token" "the history scan's pathspec excludes $token"
+done
+assert_match "$(awk '/^step_history\(\)/,/^}/' "$REPO_ROOT/scripts/audit-repo.sh")" \
+    'EXEMPT_PATHSPEC' "step_history actually uses the exemption pathspec"
+
 hook_exempt=$(grep -E "^CONTENT_EXEMPT=" "$REPO_ROOT/git/hooks/pre-commit")
 for token in 'template' 'DOCS' 'CLAUDE' 'README' 'audit-repo' 'tests/'; do
     assert_match "$hook_exempt" "$token" "the hook's content exemption covers $token"
@@ -134,7 +143,11 @@ else
 fi
 
 # ── The hook is actually wired up in a real checkout ─────────────────────────
-if [ -e "$REPO_ROOT/.git/hooks/pre-commit" ]; then
+# Only meaningful on a working machine: a CI runner checks the repo out and
+# never runs install.sh, so there is nothing to wire the hook up.
+if [ -n "${CI:-}" ]; then
+    skip "hook installation is not checked on a CI runner (install.sh never ran)"
+elif [ -e "$REPO_ROOT/.git/hooks/pre-commit" ]; then
     pass "the live checkout has a pre-commit hook installed"
 else
     fail "no pre-commit hook in this checkout" "run ./install.sh local"

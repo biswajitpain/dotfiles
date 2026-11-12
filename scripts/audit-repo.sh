@@ -29,9 +29,13 @@ ok()   { printf "${GREEN}[ok]${NC} %s\n" "$1"; }
 note() { printf "${YELLOW}[note]${NC} %s\n" "$1"; }
 
 # Files that are allowed to contain example-looking values.
-# Kept in step with CONTENT_EXEMPT in git/hooks/pre-commit. tests/ is here for
-# the same reason as this script: it is a list of secret patterns by
-# construction, so scanning it would make the scanner report itself.
+# Files that hold the SHAPE of a secret by construction: templates, the docs
+# that explain the scheme, the hook, this script, and the test suite that proves
+# the scanners work. Kept in step with CONTENT_EXEMPT in git/hooks/pre-commit.
+#
+# EXEMPT_PATHSPEC is the same list expressed as git pathspecs, for the history
+# scan. Both are derived here so step_content and step_history cannot disagree —
+# they did, and the history scan reported this repo's own test suite as a leak.
 is_exempt() {
     case "$1" in
         *.template|*/hooks/*|scripts/audit-repo.sh|DOCS.md|CLAUDE.md|README.md) return 0 ;;
@@ -39,6 +43,17 @@ is_exempt() {
         *) return 1 ;;
     esac
 }
+
+EXEMPT_PATHSPEC=(
+    ':(exclude,glob)**/*.template'
+    ':(exclude,glob)*.template'
+    ':(exclude)git/hooks'
+    ':(exclude)scripts/audit-repo.sh'
+    ':(exclude)DOCS.md'
+    ':(exclude)CLAUDE.md'
+    ':(exclude)README.md'
+    ':(exclude)tests'
+)
 
 # ── 1. Credential-bearing files that must never be tracked ───────────────────
 # Matched at any path component rather than against a fixed list of repo-root
@@ -142,7 +157,10 @@ step_history() {
     local label regex hit
     while IFS='|' read -r label regex; do
         [ -n "$label" ] || continue
-        hit=$(git log --all --format='%H' -S"$regex" --pickaxe-regex -- 2>/dev/null | head -3)
+        # Same exemptions as step_content, expressed as pathspecs. Without them
+        # the scan reports every file whose JOB is to list these patterns.
+        hit=$(git log --all --format='%H' -S"$regex" --pickaxe-regex \
+                  -- . "${EXEMPT_PATHSPEC[@]}" 2>/dev/null | head -3)
         if [ -n "$hit" ]; then
             finding "$label present in history, commits: $(printf '%s' "$hit" | tr '\n' ' ')"
         fi
